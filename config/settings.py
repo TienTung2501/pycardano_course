@@ -10,6 +10,7 @@ load_dotenv()
 
 # Lấy các thông tin cấu hình từ .env
 BLOCKFROST_PROJECT_ID = os.getenv("BLOCKFROST_PROJECT_ID")
+BLOCKFROST_URL = os.getenv("BLOCKFROST_URL")
 BLOCKFROST_NETWORK = os.getenv("BLOCKFROST_NETWORK", "TESTNET").upper()
 MNEMONIC = os.getenv("MNEMONIC")
 IPFS_API = os.getenv("IPFS_API", "https://ipfs.infura.io:5001")

@@ -26,10 +26,11 @@ Dự án được tổ chức theo cấu trúc mô-đun, mỗi mô-đun tương 
 - Viết code có cấu trúc rõ ràng, dễ mở rộng và tái sử dụng
 
 ---
+````
 
 ## 🏗️ Cấu trúc thư mục
 
-```
+````
 
 pycardano_course/
 │
@@ -93,13 +94,15 @@ cd pycardano_course
 ```bash
 python -m venv venv
 source venv/bin/activate     # macOS / Linux
-venv\Scripts\activate        # Windows
+.\venv\Scripts\activate        # Windows
+
+--> (venv) PS D:\Code\Catalyst Project\pycardano_course>
 ```
 
 ### 3️⃣ Cài đặt thư viện cần thiết:
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 ---
@@ -125,6 +128,116 @@ LOG_LEVEL=INFO
 * Bạn có thể lấy `BLOCKFROST_PROJECT_ID` tại [https://blockfrost.io](https://blockfrost.io).
 * Dự án mặc định dùng **Testnet**, không dùng tiền thật.
 * Nếu bạn chưa có ví, có thể tạo bằng script trong `wallet/wallet_manager.py`.
+
+
+---
+
+### 🔍 Vậy nếu bạn *chưa có ví* thì nên làm gì?
+
+Bạn **chưa có mnemonic**, nên file này vẫn hữu ích — chỉ cần **gọi hàm tạo mnemonic mới** có sẵn trong class này:
+
+---
+
+## 🪙 Tạo ví mới bằng file `wallet_manager.py` hiện tại
+
+### 🔧 Bước 1 — Mở terminal tại thư mục dự án và chạy:
+
+```bash
+python wallet/wallet_manager.py
+```
+
+Nếu chưa có `.env` hoặc chưa khai báo `MNEMONIC`, bạn sẽ thấy thông báo lỗi:
+
+```
+Lỗi khi khởi tạo WalletManager: MNEMONIC chưa được cung cấp...
+```
+
+Không sao cả — vì bạn sẽ **tạo mnemonic mới** ngay sau đây.
+
+---
+
+### 🪄 Bước 2 — Sinh mnemonic mới (ngẫu nhiên 24 từ)
+
+Chạy lệnh Python sau (trực tiếp trong terminal hoặc Python shell):
+
+```python
+from wallet.wallet_manager import WalletManager
+
+new_mnemonic = WalletManager.generate_new_mnemonic()
+print("🪄 Mnemonic mới của bạn:")
+print(new_mnemonic)
+```
+
+Ví dụ kết quả:
+
+```
+🪄 Mnemonic mới của bạn:
+ocean design tornado symbol major pigeon apple ... (24 từ)
+```
+
+---
+
+### 📋 Bước 3 — Lưu mnemonic vào `.env`
+
+Mở file `.env` ở thư mục gốc và thêm dòng này:
+
+```
+MNEMONIC="ocean design tornado symbol major pigeon apple ..."
+NETWORK=testnet
+BLOCKFROST_PROJECT_ID=your_blockfrost_key_here
+```
+
+> ⚠️ **CẢNH BÁO:**
+>
+> * Không chia sẻ mnemonic này công khai.
+> * Chỉ dùng cho testnet, không dùng ví mainnet thật.
+> * Không commit file `.env` lên GitHub.
+
+---
+
+### 🧩 Bước 4 — Kiểm tra ví hoạt động
+
+Sau khi lưu `.env`, bạn chạy lại:
+
+```bash
+python wallet/wallet_manager.py
+```
+
+Kết quả ví dụ:
+
+```
+Wallet address: addr_test1qp5lm...
+Mnemonic (KEEP SECRET): ocean design tornado symbo...
+```
+
+→ Giờ bạn đã có ví testnet hoạt động! 🎉
+Bạn có thể dùng địa chỉ này để nhận ADA từ faucet:
+🔗 [https://testnets.cardano.org/en/testnets/cardano/tools/faucet/](https://testnets.cardano.org/en/testnets/cardano/tools/faucet/)
+
+---
+
+### 💡 Gợi ý mở rộng
+
+Nếu bạn muốn có một **CLI tiện dụng** cho người học (để tạo ví mới nhanh),
+mình có thể giúp bạn tạo thêm file:
+
+```
+module1/create_wallet.py
+```
+
+Khi chạy:
+
+```bash
+python module1/create_wallet.py
+```
+
+→ Nó sẽ tự sinh mnemonic mới, hiển thị địa chỉ, và tự ghi sẵn vào `.env`.
+
+---
+
+👉 Bạn có muốn mình viết luôn file `module1/create_wallet.py` đó cho bạn không?
+(rất hữu ích để người học dùng trong bài học đầu tiên của khoá học PyCardano).
+```
 
 ---
 

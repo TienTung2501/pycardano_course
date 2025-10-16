@@ -1,0 +1,59 @@
+# -----------------------------
+# Python
+# -----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+venv/
+.env/
+.env.bak
+.env.local
+*.env
+
+# -----------------------------
+# Build / Distribution
+# -----------------------------
+build/
+dist/
+*.egg-info/
+*.egg
+pip-wheel-metadata/
+
+# -----------------------------
+# IDE / Editor files
+# -----------------------------
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# -----------------------------
+# OS generated files
+# -----------------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Wallet data / secrets
+# -----------------------------
+wallet_data/
+*.skey
+*.vkey
+*.addr
+*.mnemonic
+*.json
+*.db
+
+# -----------------------------
+# Logs / Debug / Cache
+# -----------------------------
+*.log
+*.tmp
+*.bak
+.cache/
+__cache__/
