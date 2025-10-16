@@ -1,0 +1,1 @@
+# 💾 Chứa file dữ liệu, metadata, mẫu json

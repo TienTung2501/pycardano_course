@@ -1,0 +1,7 @@
+pycardano
+python-dotenv
+loguru
+requests
+ipfshttpclient
+torch
+opencv-python
