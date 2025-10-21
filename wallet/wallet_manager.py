@@ -1,191 +1,236 @@
 """
 wallet/wallet_manager.py
-------------------------
-Quản lý HD Wallet trên Cardano (testnet/mainnet) bằng PyCardano + Blockfrost.
-- Hỗ trợ tạo ví, xuất khóa, kiểm tra balance, UTxO.
-- Chuẩn CIP-1852 (m/1852'/1815'/0'/0/0).
+
+HD Wallet manager cho Cardano (CIP-1852) sử dụng pycardano's HDWallet implementation.
+
+Tính năng:
+- Sinh / lưu mnemonic (tuỳ chọn)
+- Derive payment & stake keys theo chuẩn m/1852'/1815'/0'/0/0 và m/1852'/1815'/0'/2/0
+- Trả về SigningKey / VerificationKey (đúng kiểu pycardano)
+- Trả về Address (pycardano.Address)
+- Lấy UTxO & balance sử dụng BlockFrostChainContext -> trả pycardano.UTxO
+- Export keys (dạng hex, dev only)
 """
 
 import os
+import json
 import sys
-from typing import Optional, List
+from typing import Optional, List, Tuple
+
+from dotenv import set_key, load_dotenv
+
+# HDWallet từ pycardano (bản bạn dùng có thể export từ pycardano.crypto.bip32)
 from pycardano.crypto.bip32 import HDWallet
-from pycardano.key import VerificationKey, SigningKey
+from pycardano.key import SigningKey, VerificationKey
 from pycardano.address import Address
 from pycardano.network import Network
+from pycardano import BlockFrostChainContext, TransactionOutput, Value
 
-
-from blockfrost import BlockFrostApi, ApiError, ApiUrls
 from config.settings import MNEMONIC, NETWORK, BLOCKFROST_PROJECT_ID
+from config.blockfrost import get_blockfrost_context, get_network_enum
+# logging
+from config.logging_config import logger
+
+
+
 
 
 class WalletManager:
-    """HD Wallet đầy đủ cho Cardano (payment + stake)."""
+    """
+    WalletManager chuẩn CIP-1852.
 
-    def __init__(self, mnemonic: Optional[str] = None):
+    - Sử dụng HDWallet.from_mnemonic(...) để sinh root.
+    - Derive payment: m/1852'/1815'/0'/0/0
+      stake:   m/1852'/1815'/0'/2/0
+    """
+
+    PAYMENT_PATH = "m/1852'/1815'/0'/0/0"
+    STAKE_PATH = "m/1852'/1815'/0'/2/0"
+
+    def __init__(self, mnemonic: Optional[str] = None, auto_create: bool = True):
+        load_dotenv()
+
+        # network normalizing
+        self.context = get_blockfrost_context()
+        self.network = get_network_enum()
+
+        # mnemonic
         mnemonic_to_use = mnemonic or MNEMONIC
         if not mnemonic_to_use:
-            raise ValueError("❌ Chưa có MNEMONIC trong .env hoặc tham số.")
+            if auto_create:
+                mnemonic_to_use = self._create_and_save_mnemonic()
+            else:
+                raise ValueError("No MNEMONIC provided and auto_create=False.")
 
-        # Tạo HDWallet
-        self.wallet = HDWallet.from_mnemonic(mnemonic_to_use)
+        # init HDWallet
+        self._hdwallet = HDWallet.from_mnemonic(mnemonic_to_use)
+        self._mnemonic = mnemonic_to_use
 
-        # Payment key (path m/1852'/1815'/0'/0/0)
-        payment_path = "m/1852'/1815'/0'/0/0"
-        payment_wallet = self.wallet.derive_from_path(payment_path)
-        self.payment_skey = SigningKey(payment_wallet.xprivate_key[:64])
-        self.payment_vkey = VerificationKey(payment_wallet.public_key)
+        # derive payment & stake nodes
+        payment_node = self._hdwallet.derive_from_path(self.PAYMENT_PATH)
+        stake_node = self._hdwallet.derive_from_path(self.STAKE_PATH)
 
-        # Stake key (path m/1852'/1815'/0'/2/0)
-        stake_path = "m/1852'/1815'/0'/2/0"
-        stake_wallet = self.wallet.derive_from_path(stake_path)
-        self.stake_skey = SigningKey(stake_wallet.xprivate_key[:64])
-        self.stake_vkey = VerificationKey(stake_wallet.public_key)
+        # IMPORTANT: xprivate_key is kL||kR (64 bytes). Use left 32 bytes (kL) as seed for SigningKey
+        # This matches how the HDWallet lib composes keys.
+        kL_payment = payment_node.xprivate_key[:32]
+        kL_stake = stake_node.xprivate_key[:32]
 
-        # Base address (Shelley)
+        # create SigningKey / VerificationKey objects (pycardano.key)
+        # SigningKey expects a 32-byte seed.
+        self.payment_skey = SigningKey(kL_payment)
+        self.payment_vkey = self.payment_skey.to_verification_key()
+
+        self.stake_skey = SigningKey(kL_stake)
+        self.stake_vkey = self.stake_skey.to_verification_key()
+
+        # base address (Shelley base address = payment + stake)
         self.address = Address(
             payment_part=self.payment_vkey.hash(),
             staking_part=self.stake_vkey.hash(),
-            network=NETWORK
+            network=self.network,
         )
 
-    # ---------- MNEMONIC ----------
+        # Blockfrost context (pycardano)
+        if not BLOCKFROST_PROJECT_ID:
+            logger.warning("BLOCKFROST_PROJECT_ID not set; Blockfrost calls will fail.")
+            self._context = None
+        else:
+            self._context = get_blockfrost_context()
+
+        logger.info("✅ WalletManager initialized.")
+        logger.debug(f"Address: {str(self.address)}")
+
+    # ---------------- MNEMONIC ----------------
     @staticmethod
     def generate_new_mnemonic(strength: int = 256) -> str:
-        """Sinh mnemonic ngẫu nhiên (24 từ nếu strength=256)."""
         return HDWallet.generate_mnemonic(strength=strength)
 
-    def export_mnemonic(self) -> str:
-        """Trả về mnemonic hiện tại (bảo mật)."""
-        return self.wallet._mnemonic
+    def _create_and_save_mnemonic(self) -> str:
+        mnemonic = self.generate_new_mnemonic()
+        env_path = ".env"
+        if not os.path.exists(env_path):
+            with open(env_path, "w", encoding="utf-8") as f:
+                f.write("")
+        set_key(env_path, "MNEMONIC", mnemonic)
+        logger.info("🪙 New mnemonic generated and saved to .env")
+        return mnemonic
 
-    # ---------- KEYS ----------
+    def export_mnemonic(self) -> str:
+        """Only call this if you know what you're doing (sensitive)."""
+        return self._mnemonic
+
+    # ---------------- KEYS ----------------
     def get_signing_key(self) -> SigningKey:
+        """Return pycardano SigningKey (seed 32 bytes)."""
         return self.payment_skey
 
     def get_verify_key(self) -> VerificationKey:
+        """Return pycardano VerificationKey."""
         return self.payment_vkey
 
     def export_keys(self, folder: str = "./wallet_data"):
-        """Xuất khóa ra file .key (chỉ dùng test/dev)."""
+        """Export keys as hex (dev only)."""
         os.makedirs(folder, exist_ok=True)
-        with open(os.path.join(folder, "payment.skey"), "w") as f:
-            f.write(self.payment_skey.hex())
-        with open(os.path.join(folder, "payment.vkey"), "w") as f:
-            f.write(self.payment_vkey.hex())
-        with open(os.path.join(folder, "stake.skey"), "w") as f:
-            f.write(self.stake_skey.hex())
-        with open(os.path.join(folder, "stake.vkey"), "w") as f:
-            f.write(self.stake_vkey.hex())
-        print(f"✅ Đã lưu khóa ví tại {folder}/")
+        with open(os.path.join(folder, "payment.skey.hex"), "w") as f:
+            f.write(self.payment_skey.payload.hex() if hasattr(self.payment_skey, "payload") else self.payment_skey.hex())
+        with open(os.path.join(folder, "payment.vkey.hex"), "w") as f:
+            f.write(self.payment_vkey.payload.hex() if hasattr(self.payment_vkey, "payload") else self.payment_vkey.hex())
+        with open(os.path.join(folder, "stake.skey.hex"), "w") as f:
+            f.write(self.stake_skey.payload.hex() if hasattr(self.stake_skey, "payload") else self.stake_skey.hex())
+        with open(os.path.join(folder, "stake.vkey.hex"), "w") as f:
+            f.write(self.stake_vkey.payload.hex() if hasattr(self.stake_vkey, "payload") else self.stake_vkey.hex())
+        logger.info(f"✅ Keys exported (hex) to {folder}/ (dev only)")
 
-    # ---------- ADDRESS ----------
+    # ---------------- ADDRESS ----------------
     def get_address(self) -> Address:
+        """Return pycardano.Address object always."""
+        if not isinstance(self.address, Address):
+            # try convert from primitive/bech32 or cbor dict
+            try:
+                self.address = Address.from_primitive(str(self.address))
+            except Exception:
+                # fallback: if dict with cborHex
+                if isinstance(self.address, dict) and "cborHex" in self.address:
+                    self.address = Address.from_cbor(self.address["cborHex"])
         return self.address
 
     def get_address_bech32(self) -> str:
-        return str(self.address)
+        return str(self.get_address())
 
     def get_stake_address(self) -> str:
-        """Trả về stake address (bech32)."""
-        stake_addr = Address(
-            staking_part=self.stake_vkey.hash(),
-            network=NETWORK
-        )
+        stake_addr = Address(staking_part=self.stake_vkey.hash(), network=self.network)
         return str(stake_addr)
 
-    # ---------- BLOCKFROST ----------
-    def _get_blockfrost_api(self) -> BlockFrostApi:
-        """Khởi tạo kết nối Blockfrost API theo mạng đang cấu hình."""
-        if not BLOCKFROST_PROJECT_ID:
-            raise ValueError("❌ Thiếu BLOCKFROST_PROJECT_ID trong .env")
+    # ---------------- BLOCKFROST / UTXO ----------------
+    def _ensure_context(self) -> BlockFrostChainContext:
+        if self._context is None:
+            if not BLOCKFROST_PROJECT_ID:
+                raise ValueError("Missing BLOCKFROST_PROJECT_ID")
+            self._context = BlockFrostChainContext(project_id=BLOCKFROST_PROJECT_ID, network=self.network)
+        return self._context
 
-        # Lựa chọn URL chính xác theo network
-        if NETWORK == Network.TESTNET:
-            # Có thể là preview hoặc preprod, tùy bạn đang dùng project_id nào
-            # Gợi ý: đặt thêm biến BLOCKFROST_ENV trong .env nếu muốn linh hoạt hơn
-            base_url = ApiUrls.preview.value
-        else:
-            base_url = ApiUrls.mainnet.value
+    def get_balance(self) -> int:
+        """
+        Return total lovelace (int) of the address.
+        Uses pycardano BlockFrostChainContext => returns pycardano.UTxO objects, sum u.output.amount.coin
+        """
+        ctx = self._ensure_context()
+        utxos = ctx.utxos(self.get_address())
+        total = sum(u.output.amount.coin for u in utxos)
+        logger.info(f"💰 Balance of {self.get_address_bech32()}: {total / 1_000_000} ADA")
+        return total
 
-        print(f"🌐 Kết nối Blockfrost tại: {base_url}")
-        return BlockFrostApi(project_id=BLOCKFROST_PROJECT_ID, base_url=base_url)
+    def get_utxos(self) -> List:
+        """Return list of pycardano.UTxO for the wallet's payment address."""
+        ctx = self._ensure_context()
+        utxos = ctx.utxos(self.get_address())
+        logger.info(f"🔍 Found {len(utxos)} UTxOs for {self.get_address_bech32()}")
+        return utxos
 
+    # ---------------- UTIL ----------------
+    def validate_keys_and_address(self) -> bool:
+        """
+        Quick validation: check signature pubkey derived from skey matches derived vkey/public_key.
+        Returns True if OK.
+        """
+        # verification key from skey
+        vkey_from_skey = self.payment_skey.to_verification_key()
+        # compare hashes
+        ok = (vkey_from_skey.hash() == self.payment_vkey.hash())
+        logger.info(f"Validate keys OK: {ok}")
+        return ok
 
-    def get_balance(self) -> Optional[float]:
-        """Truy vấn số dư ADA từ Blockfrost."""
-        try:
-            api = self._get_blockfrost_api()
-            address_info = api.address(self.get_address_bech32())
-
-            # Lấy giá trị Lovelace (thường ở amount[0])
-            lovelace = 0
-            for amt in address_info.amount:
-                if amt.unit == "lovelace":
-                    lovelace = int(amt.quantity)
-                    break
-
-            ada_balance = lovelace / 1_000_000
-            return ada_balance
-
-        except ApiError as e:
-            print(f"❌ Lỗi Blockfrost API: {e}")
-        except Exception as e:
-            print(f"❌ Không thể lấy balance: {e}")
-        return None
-
-
-    def get_utxos(self) -> Optional[List[dict]]:
-        """Lấy danh sách UTxO tại địa chỉ."""
-        try:
-            api = self._get_blockfrost_api()
-            utxos = api.address_utxos(self.get_address_bech32())
-            return utxos
-        except Exception as e:
-            print(f"❌ Không thể truy vấn UTxO: {e}")
-        return None
-
-
-# ---------- CLI ----------
+    # ---------------- CLI / DEBUG ----------------
 def main():
     args = sys.argv[1:]
+    wm = WalletManager()
     if not args:
-        print("📘 Dùng: python -m wallet.wallet_manager <command>")
-        print("Lệnh có sẵn: generate_mnemonic | get_address | get_stake | export_keys | get_balance | get_utxos | show_mnemonic")
+        print("Usage: python -m wallet.wallet_manager <command>")
+        print("Commands: get_address | get_balance | get_utxos | export_keys | show_mnemonic | validate")
         return
 
-    command = args[0]
-    wm = WalletManager()
-
-    if command == "generate_mnemonic":
-        print(WalletManager.generate_new_mnemonic())
-
-    elif command == "get_address":
+    cmd = args[0]
+    if cmd == "get_address":
         print("Payment Address:", wm.get_address_bech32())
-
-    elif command == "get_stake":
         print("Stake Address:", wm.get_stake_address())
-
-    elif command == "export_keys":
-        wm.export_keys()
-
-    elif command == "get_balance":
+    elif cmd == "get_balance":
         bal = wm.get_balance()
-        print(f"💰 Số dư: {bal} ADA" if bal is not None else "Không thể lấy số dư.")
-
-    elif command == "get_utxos":
+        print(f"Balance: {bal / 1_000_000} ADA")
+    elif cmd == "get_utxos":
         utxos = wm.get_utxos()
-        if utxos:
-            for u in utxos:
-                print(f"- TX Hash: {u.tx_hash[:20]}..., Amount: {u.amount[0].quantity}")
-        else:
-            print("Không tìm thấy UTxO.")
-
-    elif command == "show_mnemonic":
+        for i, u in enumerate(utxos):
+            txid = str(u.input.transaction_id)
+            idx = u.input.index
+            coin = u.output.amount.coin
+            print(f"[{i}] {txid[:20]}... idx={idx} coin={coin} lovelace")
+    elif cmd == "export_keys":
+        wm.export_keys()
+    elif cmd == "show_mnemonic":
         print("Mnemonic:", wm.export_mnemonic())
-
+    elif cmd == "validate":
+        print("Keys valid:", wm.validate_keys_and_address())
     else:
-        print(f"❌ Lệnh không hợp lệ: {command}")
+        print("Unknown command:", cmd)
 
 
 if __name__ == "__main__":

@@ -355,9 +355,6 @@ rm -rf __pycache__ data/policies data/wallets
 MIT License © 2025 – Dự án học tập và chia sẻ kiến thức Cardano.
 
 ```
-
----
-
 Bạn có muốn mình **tạo file `README.md` thật (để tải về .zip hoặc copy nguyên thư mục)** không?  
 Nếu có, mình sẽ **đóng gói toàn bộ project** (gồm các file bạn đã có + README) để bạn tải trực tiếp.
 ```

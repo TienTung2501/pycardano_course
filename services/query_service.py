@@ -48,7 +48,7 @@ class QueryService:
                         token_id = f"{policy_id.hex()}:{asset_name.decode('utf-8')}"
                         tokens[token_id] = tokens.get(token_id, 0) + qty
 
-        logger.info(f"📫 Địa chỉ {addr[:15]}... có {total_ada/1_000_000} ADA và {len(tokens)} token.")
+        logger.info(f"📫 Địa chỉ {addr}... có {total_ada/1_000_000} ADA và {len(tokens)} token.")
         return {
             "address": addr,
             "balance_ada": total_ada / 1_000_000,
@@ -64,7 +64,9 @@ class QueryService:
         """
         addr = address or self.wallet.get_address_bech32()
         utxos = self.context.utxos(addr)
-        logger.info(f"🔍 Tìm thấy {len(utxos)} UTXO cho {addr[:15]}...")
+        logger.info(f"🔍 Tìm thấy {len(utxos)} UTXO cho {addr}...")
+        for i, utxo in enumerate(utxos, 1):
+            print(f"{i}. TxHash: {utxo.input.transaction_id}, Index: {utxo.input.index}, Amount: {utxo.output.amount}")
         return utxos
 
     def get_transaction_info(self, tx_hash: str) -> Dict[str, Any]:
@@ -110,14 +112,33 @@ class QueryService:
         Lấy thông tin block mới nhất.
         """
         block = self.context.api.block_latest()
-        logger.info(f"⛓️ Block mới nhất: {block['hash'][:10]}... slot {block['slot']}")
+        logger.info(f"⛓️ Block mới nhất: {block.hash}... slot {block.slot}")
         return block
 
 
-# Chạy thử nhanh
+# -------------------------------------------------------------------
+# ✅ TEST CÁC HÀM KHI CHẠY TRỰC TIẾP FILE
+# -------------------------------------------------------------------
 if __name__ == "__main__":
     q = QueryService()
+
+    print("\n=== 🧩 Thông tin ví ===")
     info = q.get_address_info()
-    print(info)
+    print(f"Địa chỉ: {info['address']}")
+    print(f"Số dư ADA: {info['balance_ada']} ADA")
+    if info["tokens"]:
+        print("Token trong ví:")
+        for k, v in info["tokens"].items():
+            print(f" - {k}: {v}")
+    else:
+        print(" - Không có token nào.")
+
+    print("\n=== 💰 Danh sách UTXO ===")
+    utxos = q.get_utxos()
+
+    print("\n=== ⛓️ Block mới nhất ===")
     block = q.get_latest_block()
-    print("Latest block:", block["slot"])
+    print(f"Hash: {block.hash}")
+    print(f"Slot: {block.slot}")
+    print(f"Height: {block.height}")
+    print(f"Time: {block.time}")
