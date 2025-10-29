@@ -1,3 +1,12 @@
+"""
+Lesson 7 — Burn NFTs
+
+Mục tiêu: Burn (đốt) một danh sách NFT đã phát hành trước đó bằng cùng policy key.
+
+Nguyên tắc: số lượng âm trong `Asset` (ví dụ -1) biểu thị burn. Cần policy signing key
+khớp với khi mint.
+"""
+
 import os
 import random
 import sys
@@ -8,6 +17,7 @@ from dotenv import load_dotenv
 
 from pycardano import *
 
+# Nạp .env
 load_dotenv()
 network = os.getenv("BLOCKFROST_NETWORK")
 wallet_mnemonic = os.getenv("MNEMONIC")
@@ -19,47 +29,23 @@ types = ["lion", "elephant", "panda", "sloth", "tiger", "wolf"]
 assets = [
     {
         "name": "Pycardano_test_NFT_001",
-        "attack": str(random.randint(1, 70)),
-        "speed": str(random.randint(1, 70)),
-        "defense": str(random.randint(1, 70)),
-        "health": str(random.randint(1, 70)),
-        "type": random.choice(types),
     },
     {
         "name": "Pycardano_test_NFT_002",
-        "attack": str(random.randint(1, 70)),
-        "speed": str(random.randint(1, 70)),
-        "defense": str(random.randint(1, 70)),
-        "health": str(random.randint(1, 70)),
-        "type": random.choice(types),
     },
     {
         "name": "Pycardano_test_NFT_003",
-        "attack": str(random.randint(1, 70)),
-        "speed": str(random.randint(1, 70)),
-        "defense": str(random.randint(1, 70)),
-        "health": str(random.randint(1, 70)),
-        "type": random.choice(types),
     },
     {
         "name": "Pycardano_test_NFT_004",
-        "attack": str(random.randint(1, 70)),
-        "speed": str(random.randint(1, 70)),
-        "defense": str(random.randint(1, 70)),
-        "health": str(random.randint(1, 70)),
-        "type": random.choice(types),
     },
     {
         "name": "Pycardano_test_NFT_005",
-        "attack": str(random.randint(1, 70)),
-        "speed": str(random.randint(1, 70)),
-        "defense": str(random.randint(1, 70)),
-        "health": str(random.randint(1, 70)),
-        "type": random.choice(types),
     },
 ]
 
 
+# Map network (testnet → preview)
 if network == "testnet":
     base_url = ApiUrls.preview.value
     cardano_network = Network.TESTNET
@@ -68,6 +54,7 @@ else:
     cardano_network = Network.MAINNET
 
 
+# Derive payment/staking từ mnemonic
 new_wallet = crypto.bip32.HDWallet.from_mnemonic(wallet_mnemonic)
 payment_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/0/0")
 staking_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/2/0")
@@ -75,6 +62,7 @@ payment_skey = ExtendedSigningKey.from_hdwallet(payment_key)
 staking_skey = ExtendedSigningKey.from_hdwallet(staking_key)
 
 
+# Địa chỉ ví chủ sở hữu NFT
 main_address = Address(
     payment_part=payment_skey.to_verification_key().hash(),
     staking_part=staking_skey.to_verification_key().hash(),
@@ -85,6 +73,7 @@ main_address = Address(
 print(" ")
 print(f"Derived address: {main_address}")
 
+# Kiểm tra UTxO
 api = BlockFrostApi(project_id=blockfrost_api_key, base_url=base_url)
 
 try:
@@ -101,11 +90,12 @@ except Exception as e:
     sys.exit(1)
 
 
+# Context cho build & submit
 cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_url)
 
 builder = TransactionBuilder(cardano)
 
-# Tạo thư mục keys ở cùng cấp với tệp Python
+# Tải policy keys (đã tạo khi mint) ở cùng cấp với file (demo)
 keys_dir = os.path.join(os.path.dirname(__file__), "keys")
 if not os.path.exists(keys_dir):
     os.makedirs(keys_dir)
@@ -114,16 +104,13 @@ if not os.path.exists(keys_dir):
 policy_skey_path = os.path.join(keys_dir, "policy.skey")
 policy_vkey_path = os.path.join(keys_dir, "policy.vkey")
 
-# Tạo hoặc tải khóa chính sách (policy keys)
+# Kiểm tra xem khóa chính sách có tồn tại không
 if not exists(policy_skey_path) or not exists(policy_vkey_path):
-    payment_key_pair = PaymentKeyPair.generate()
-    payment_signing_key = payment_key_pair.signing_key
-    payment_verification_key = payment_key_pair.verification_key
-    payment_signing_key.save(policy_skey_path)
-    payment_verification_key.save(policy_vkey_path)
+    print(f"Không tìm thấy {policy_skey_path} hoặc {policy_vkey_path}. Cần tạo khóa khi phát hành token trước.")
+    sys.exit(1)
 
 
-# Tải khóa chính sách
+# Tải policy signing/verifying keys → dựng ScriptPubkey → ScriptAll → policy_id
 policy_signing_key = PaymentSigningKey.load(policy_skey_path)
 policy_verification_key = PaymentVerificationKey.load(policy_vkey_path)
 pub_key_policy = ScriptPubkey(policy_verification_key.hash())
@@ -138,40 +125,22 @@ native_scripts = [policy]
 my_asset = Asset()
 my_nft = MultiAsset()
 
-metadata = {721: {policy_id_hex: {}}}
 
-asset_minted = []
+asset_burned = []
 
 for asset in assets:
     asset_name = asset["name"]
     asset_name_bytes = asset_name.encode("utf-8")
-    metadata[721][policy_id_hex][asset_name] = {
-        "name": asset_name,
-        "type": asset["type"],
-        "attack": asset["attack"],
-        "speed": asset["speed"],
-        "defense": asset["defense"],
-        "health": asset["health"],
-    }
     nft1 = AssetName(asset_name_bytes)
-    my_asset[nft1] = 1
-
+    my_asset[nft1] = -1  # Giá trị âm để burn NFT
+    asset_burned.append(asset_name)
 
 my_nft[policy_id] = my_asset
 builder.native_scripts = native_scripts
-
-auxiliary_data = AuxiliaryData(AlonzoMetadata(metadata=Metadata(metadata)))
-builder.auxiliary_data = auxiliary_data
-
 builder.mint = my_nft
 
-min_val = min_lovelace(
-    cardano, output=TransactionOutput(main_address, Value(0, my_nft))
-)
 
-builder.add_output(TransactionOutput(main_address, Value(min_val, my_nft)))
-
-
+# Input address để builder chọn UTxO trả phí
 builder.add_input_address(main_address)
 signed_tx = builder.build_and_sign(
     [payment_skey, policy_signing_key], change_address=main_address

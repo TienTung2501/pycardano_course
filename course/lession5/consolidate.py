@@ -1,3 +1,13 @@
+"""
+Lesson 5 — Consolidate UTxOs
+
+Mục tiêu: gộp tất cả UTxO của địa chỉ về một UTxO đổi duy nhất (giúp giảm số lượng
+UTxO và tối ưu phí ở các lần giao dịch sau).
+
+Điểm mấu chốt: thay vì dùng `add_input_address` (chọn UTxO tối ưu), script này
+chủ động add từng UTxO làm input để "ăn" hết toàn bộ UTxO hiện có.
+"""
+
 import os
 import sys
 from blockfrost import ApiError, ApiUrls, BlockFrostApi
@@ -10,7 +20,7 @@ network = os.getenv("BLOCKFROST_NETWORK")
 wallet_mnemonic = os.getenv("MNEMONIC")
 blockfrost_api_key = os.getenv("BLOCKFROST_PROJECT_ID")
 
-# Thiết lập mạng và URL API
+# Thiết lập mạng và URL API (testnet → preview)
 if network == "testnet":
     base_url = ApiUrls.preview.value
     cardano_network = Network.TESTNET
@@ -18,14 +28,14 @@ else:
     base_url = ApiUrls.mainnet.value
     cardano_network = Network.MAINNET
 
-# Tạo khóa từ mnemonic
+# Tạo khóa từ mnemonic (payment/staking)
 new_wallet = crypto.bip32.HDWallet.from_mnemonic(wallet_mnemonic)
 payment_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/0/0")
 staking_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/2/0")
 payment_skey = ExtendedSigningKey.from_hdwallet(payment_key)
 staking_skey = ExtendedSigningKey.from_hdwallet(staking_key)
 
-# Tạo địa chỉ chính
+# Địa chỉ ví chính để gom UTxO
 main_address = Address(
     payment_part=payment_skey.to_verification_key().hash(),
     staking_part=staking_skey.to_verification_key().hash(),
@@ -34,10 +44,10 @@ main_address = Address(
 
 print(f"Địa chỉ được tạo: {main_address}")
 
-# Khởi tạo API BlockFrost
+# Khởi tạo Blockfrost API để liệt kê UTxO
 api = BlockFrostApi(project_id=blockfrost_api_key, base_url=base_url)
 
-# Lấy UTxO
+# Lấy tất cả UTxO của địa chỉ
 try:
     utxos = api.address_utxos(main_address)
 except Exception as e:
@@ -50,13 +60,13 @@ except Exception as e:
         print(e.message)
         sys.exit(1)
 
-# Khởi tạo ngữ cảnh chuỗi BlockFrost
+# Ngữ cảnh chuỗi để build/submit giao dịch
 cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_url)
 
-# Tạo TransactionBuilder
+# TransactionBuilder cho consolidate
 builder = TransactionBuilder(cardano)
 
-# Thêm tất cả UTxO làm đầu vào
+# Thêm tất cả UTxO làm đầu vào (không dùng add_input_address để đảm bảo gom hết)
 for utxo in utxos:
     tx_input = TransactionInput.from_primitive([utxo.tx_hash, utxo.tx_index])
     # Xử lý UTxO đa tài sản
@@ -79,7 +89,7 @@ for utxo in utxos:
 # builder.add_output(TransactionOutput(main_address, Value(total_ada)))
 
 
-# Tự động tính phí và xử lý đổi
+# Không thêm output cụ thể: để builder tự cân bằng (phí + 1 output đổi) về địa chỉ
 builder.auxiliary_data = None  # Tùy chọn: Đặt None nếu không có metadata
 signed_tx = builder.build_and_sign([payment_skey], change_address=main_address)
 

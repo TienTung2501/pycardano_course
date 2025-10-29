@@ -1,59 +1,84 @@
-# -----------------------------
-# Python
-# -----------------------------
-__pycache__/
-*.py[cod]
-*$py.class
-*.pyo
-*.pyd
-*.so
-
-# Virtual environment
-venv/
-.env/
-.env.bak
-.env.local
-*.env
-
-# -----------------------------
-# Build / Distribution
-# -----------------------------
-build/
-dist/
-*.egg-info/
-*.egg
-pip-wheel-metadata/
-
-# -----------------------------
-# IDE / Editor files
-# -----------------------------
-.vscode/
-.idea/
-*.sublime-project
-*.sublime-workspace
-
-# -----------------------------
-# OS generated files
-# -----------------------------
+# ----------------
+# OS / IDE
+# ----------------
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
 
-# -----------------------------
-# Wallet data / secrets
-# -----------------------------
+# ----------------
+# Python
+# ----------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.build/
+build/
+dist/
+.eggs/
+*.egg-info/
+.venv/
+venv/
+env/
+ENV/
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# ----------------
+# Node/Frontend (Next.js)
+# ----------------
+node_modules/
+.next/
+course/cip68_dynamic_nft/frontend/node_modules/
+course/cip68_dynamic_nft/frontend/.next/
+course/cip68_dynamic_nft/frontend/.env
+course/cip68_dynamic_nft/frontend/.env.local
+course/cip68_dynamic_nft/frontend/.env.*.local
+
+# ----------------
+# Aiken/Plutus build
+# ----------------
+contracts/**/build/
+course/**/hello_world/build/
+course/cip68_dynamic_nft/contract/build/
+
+# ----------------
+# Secrets / Keys
+# ----------------
+.env
+.env.local
+.env.*.local
+keys/*.skey
+keys/*.vkey
+keys/*.key
+course/**/keys/*.skey
+course/**/keys/*.vkey
+course/**/keys/*.key
 wallet_data/
-*.skey
-*.vkey
-*.addr
-*.mnemonic
-*.json
-*.db
+data/wallets/
 
-# -----------------------------
-# Logs / Debug / Cache
-# -----------------------------
+# ----------------
+# Logs & temp
+# ----------------
+logs/
 *.log
-*.tmp
-*.bak
+tmp/
+temp/
 .cache/
-__cache__/
+
+# ----------------
+# Models / large binaries
+# ----------------
+models/
+*.pt
+*.onnx
+*.pb
+*.pkl

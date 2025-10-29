@@ -1,3 +1,16 @@
+"""
+Lesson 6 — Mint Fungible Token (FT) with Native Script
+
+Mục tiêu: phát hành 100 FT (ví dụ Pycardano_test_COINP_003) bằng policy khóa công khai.
+
+Luồng chính:
+1) Đọc .env, thiết lập mạng và tạo ví payment/staking.
+2) Sinh hoặc tải policy keys (payment signing/verifying key dành cho policy) trong thư mục `keys/` cạnh file.
+3) Tạo ScriptPubkey từ policy vkey → ScriptAll → policy_id.
+4) Dựng MultiAsset và tính min-ADA cho output chứa token.
+5) Dựng giao dịch: native_scripts, mint, output trả token về ví, TTL → build_and_sign → submit.
+"""
+
 import os
 import sys
 from os.path import exists
@@ -5,13 +18,13 @@ from blockfrost import ApiError, ApiUrls, BlockFrostApi
 from dotenv import load_dotenv
 from pycardano import *
 
-# Tải biến môi trường
+# Nạp .env
 load_dotenv()
 network = os.getenv("BLOCKFROST_NETWORK")
 wallet_mnemonic = os.getenv("MNEMONIC")
 blockfrost_api_key = os.getenv("BLOCKFROST_PROJECT_ID")
 
-# Thiết lập mạng và URL API
+# Thiết lập mạng và URL API (testnet → preview)
 if network == "testnet":
     base_url = ApiUrls.preview.value
     cardano_network = Network.TESTNET
@@ -19,14 +32,14 @@ else:
     base_url = ApiUrls.mainnet.value
     cardano_network = Network.MAINNET
 
-# Tạo khóa từ mnemonic
+# Tạo khóa từ mnemonic (payment/staking)
 new_wallet = crypto.bip32.HDWallet.from_mnemonic(wallet_mnemonic)
 payment_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/0/0")
 staking_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/2/0")
 payment_skey = ExtendedSigningKey.from_hdwallet(payment_key)
 staking_skey = ExtendedSigningKey.from_hdwallet(staking_key)
 
-# Tạo địa chỉ chính (ví gửi)
+# Địa chỉ ví phát hành (đồng thời nhận token)
 main_address = Address(
     payment_part=payment_skey.to_verification_key().hash(),
     staking_part=staking_skey.to_verification_key().hash(),
@@ -36,10 +49,10 @@ main_address = Address(
 print(f"Địa chỉ ví gửi: {main_address}")
 
 
-# Khởi tạo API BlockFrost
+# Khởi tạo Blockfrost API để kiểm tra UTxO/số dư
 api = BlockFrostApi(project_id=blockfrost_api_key, base_url=base_url)
 
-# Lấy UTxO
+# Lấy UTxO để ước lượng số dư tối thiểu cần thiết
 try:
     utxos = api.address_utxos(main_address)
 except Exception as e:
@@ -56,10 +69,10 @@ except Exception as e:
 total_ada = sum(int(utxo.amount[0].quantity) for utxo in utxos)
 print(f"Tổng ADA khả dụng: {total_ada / 1_000_000} ADA")
 
-# Khởi tạo ngữ cảnh chuỗi BlockFrost
+# Ngữ cảnh chuỗi để build/submit giao dịch
 cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_url)
 
-# Tạo thư mục keys ở cùng cấp với tệp Python
+# Tạo thư mục keys cạnh file (demo; dự án lớn nên gom về `keys/` gốc)
 keys_dir = os.path.join(os.path.dirname(__file__), "keys")
 if not os.path.exists(keys_dir):
     os.makedirs(keys_dir)
@@ -68,7 +81,7 @@ if not os.path.exists(keys_dir):
 policy_skey_path = os.path.join(keys_dir, "policy.skey")
 policy_vkey_path = os.path.join(keys_dir, "policy.vkey")
 
-# Tạo hoặc tải khóa chính sách (policy keys)
+# Tạo hoặc tải khóa chính sách (policy signing/verifying keys)
 if not exists(policy_skey_path) or not exists(policy_vkey_path):
     payment_key_pair = PaymentKeyPair.generate()
     payment_signing_key = payment_key_pair.signing_key
@@ -76,7 +89,7 @@ if not exists(policy_skey_path) or not exists(policy_vkey_path):
     payment_signing_key.save(policy_skey_path)
     payment_verification_key.save(policy_vkey_path)
 
-# Tải khóa chính sách
+# Tải khóa chính sách và dựng policy script (ScriptPubkey → ScriptAll)
 policy_signing_key = PaymentSigningKey.load(policy_skey_path)
 policy_verification_key = PaymentVerificationKey.load(policy_vkey_path)
 pub_key_policy = ScriptPubkey(policy_verification_key.hash())
@@ -85,7 +98,7 @@ policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
 
-# Xác định token để phát hành
+# Xác định token để phát hành (tên và số lượng)
 asset_name = "Pycardano_test_COINP_003"
 asset_name_bytes = asset_name.encode("utf-8")
 token = AssetName(asset_name_bytes)
@@ -94,7 +107,7 @@ multiasset = MultiAsset()
 new_asset[token] = 100  # Số lượng token phát hành
 multiasset[policy_id] = new_asset
 
-# Tạo TransactionBuilder
+# Tạo TransactionBuilder và cấu hình minting
 builder = TransactionBuilder(cardano)
 
 # # Thêm tất cả UTxO làm đầu vào thủ công
@@ -109,12 +122,12 @@ builder = TransactionBuilder(cardano)
 #     utxo_obj = UTxO(tx_input, tx_output)
 #     builder.add_input(utxo_obj)
 
-builder.add_input_address(main_address)
+builder.add_input_address(main_address)  # để builder tự chọn UTxO hợp lý
 # Thêm thông tin phát hành token
 builder.native_scripts = native_scripts
 builder.mint = multiasset
 
-# Tính ADA tối thiểu cho đầu ra chứa token
+# Tính ADA tối thiểu cho đầu ra chứa token (min-ADA phụ thuộc số lượng/tên tài sản)
 min_val = min_lovelace(
     cardano, output=TransactionOutput(main_address, Value(0, multiasset))
 )
@@ -127,10 +140,10 @@ if total_ada < min_val + 2_000_000:  # Dự phòng 2 ADA cho phí và UTxO tối
 # Thêm đầu ra chứa token và ADA tối thiểu
 builder.add_output(TransactionOutput(main_address, Value(min_val, multiasset)))
 
-# Thiết lập TTL
+# Thiết lập TTL (demo): last_block_slot + 1000
 builder.ttl = cardano.last_block_slot + 1000
 
-# Tự động tính phí và xử lý đổi
+# Build/sign: ký bởi ví và policy signing key; đổi (change) về main_address
 builder.auxiliary_data = None  # Tùy chọn: Đặt None nếu không có metadata
 try:
     signed_tx = builder.build_and_sign(
