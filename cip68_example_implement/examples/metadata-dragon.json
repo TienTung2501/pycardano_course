@@ -1,0 +1,23 @@
+{
+  "name": "Legendary Dragon #001",
+  "image": "ipfs://QmYx6GsYAKnNzZ9A6NvEKV9nf1VaDzJrqDR4kmCKp8JvCE",
+  "description": "A rare legendary fire dragon with immense power.",
+  "attributes": [
+    {
+      "trait_type": "Element",
+      "value": "Fire"
+    },
+    {
+      "trait_type": "Rarity",
+      "value": "Legendary"
+    },
+    {
+      "trait_type": "Power",
+      "value": "95"
+    },
+    {
+      "trait_type": "Generation",
+      "value": "1"
+    }
+  ]
+}

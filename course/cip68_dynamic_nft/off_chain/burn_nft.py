@@ -32,11 +32,18 @@ from off_chain.common.config import (
 
 def _mk_keys_from_mnemonic(mnemonic: str, idx: int) -> Tuple[ExtendedSigningKey, ExtendedVerificationKey, Address]:
     hd = HDWallet.from_mnemonic(mnemonic)
-    hd = hd.derive(1852, hardened=True).derive(1815, hardened=True).derive(0, hardened=True).derive(0).derive(idx)
-    xsk = ExtendedSigningKey(hd.xprivate_key)
-    xvk = ExtendedVerificationKey(xsk.to_verification_key())
+    payment_hd = hd.derive(1852, hardened=True).derive(1815, hardened=True).derive(0, hardened=True).derive(0).derive(idx)
+    staking_hd = hd.derive(1852, hardened=True).derive(1815, hardened=True).derive(0, hardened=True).derive(2).derive(0)
+    xsk = ExtendedSigningKey.from_hdwallet(payment_hd)
+    staking_key = ExtendedSigningKey.from_hdwallet(staking_hd)
+    xvk = xsk.to_verification_key()
     vkh = xvk.hash()
-    addr = Address(payment_part=vkh, network=network())
+    # Địa chỉ ví chính để gom UTxO
+    addr = Address(
+        payment_part=xsk.to_verification_key().hash(),
+        staking_part=staking_key.to_verification_key().hash(),
+        network=network(),
+    )
     return xsk, xvk, addr
 
 def main():

@@ -1,0 +1,14 @@
+name = "pycardano_course/cip68_example"
+version = "1.0.0"
+license = "MIT"
+description = "CIP-68 Dynamic NFT Implementation for Educational Purposes"
+
+[repository]
+user = "pycardano_course"
+project = "cip68_example_implement"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "main"
+source = "github"

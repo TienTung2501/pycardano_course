@@ -1,0 +1,10 @@
+# CIP-68 Simple Example Dependencies
+
+# PyCardano - Cardano blockchain library (Conway/Plutus V3 support)
+pycardano>=0.13.4
+
+# Python-dotenv - Load environment variables from .env file
+python-dotenv>=1.0.0
+
+# Optional: For better CLI experience
+colorama>=0.4.6  # Colored terminal output (Windows compatible)

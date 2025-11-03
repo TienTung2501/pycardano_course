@@ -1,0 +1,14 @@
+name = "example/cip68_simple"
+version = "0.1.0"
+license = "Apache-2.0"
+description = "Simple CIP-68 NFT example for learning"
+
+[repository]
+user = "example"
+project = "cip68_simple"
+platform = "github"
+
+[[dependencies]]
+name = "aiken-lang/stdlib"
+version = "main"
+source = "github"

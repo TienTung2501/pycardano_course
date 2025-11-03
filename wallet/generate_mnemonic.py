@@ -28,13 +28,13 @@ def main():
 
     updated = False
     for i, line in enumerate(lines):
-        if line.startswith("MNEMONIC="):
-            lines[i] = f"MNEMONIC={mnemonic}\n"
+        if line.startswith("MNEMONIC1="):
+            lines[i] = f"MNEMONIC1={mnemonic}\n"
             updated = True
             break
 
     if not updated:
-        lines.append(f"MNEMONIC={mnemonic}\n")
+        lines.append(f"MNEMONIC1={mnemonic}\n")
 
     with open(ENV_PATH, "w", encoding="utf-8") as f:
         f.writelines(lines)

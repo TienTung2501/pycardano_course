@@ -1,0 +1,4 @@
+pycardano>=0.11.0
+python-dotenv>=1.0.0
+mnemonic>=0.20
+cbor2>=5.4.6

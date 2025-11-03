@@ -1,6 +1,8 @@
 from pathlib import Path
 import os
-
+from dotenv import load_dotenv
+# Tải biến môi trường từ .env
+load_dotenv()
 # Gốc module CIP-68 trong repo hiện tại: .../course/cip68_dynamic_nft
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
