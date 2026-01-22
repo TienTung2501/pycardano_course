@@ -41,6 +41,23 @@ Mục tiêu của Thủ công: Là sự KIỂM SOÁT TUYỆT ĐỐI.
 Trong bài học Consolidate, mục đích của chúng ta là DỌN NHÀ. Chúng ta muốn ép buộc giao dịch phải "ăn" tất cả mọi thứ đang có, dù là những đồng vụn vặt nhất (Dust).
 
 Bằng cách viết vòng lặp for, chúng ta ra lệnh: "Tôi không quan tâm cần bao nhiêu, hãy lấy HẾT tất cả những gì tôi tìm thấy và ném vào lò lửa (Input)."
+
+Bước 2: Khởi tạo môi trường ảo
+Chạy lệnh sau để tạo thư mục venv chứa môi trường riêng:
+python3 -m venv venv
+
+
+Bước 3: Kích hoạt môi trường (Activate)
+Đây là điểm khác biệt chính so với Windows. Trên Linux/Ubuntu, bạn dùng lệnh source:
+source venv/bin/activate
+
+
+Khi thành công, bạn sẽ thấy tên môi trường (venv) xuất hiện phía trước dấu nhắc lệnh (prompt) trong terminal.
+4. Cài đặt thư viện PyCardano
+Khi đã ở trong môi trường (venv), việc cài đặt thư viện diễn ra rất nhanh chóng và an toàn.
+Chạy lệnh:
+pip install pycardano blockfrost-python
+
 """
 
 import os
