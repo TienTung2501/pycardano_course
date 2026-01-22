@@ -5,15 +5,13 @@ Mục tiêu: gộp tất cả UTxO của địa chỉ về một UTxO đổi duy
 UTxO và tối ưu phí ở các lần giao dịch sau).
 
 Mọi người có thể hiểu đơn giản như sau:
-Chào các bạn, hôm nay chúng ta sẽ đến với Bài 5: Consolidate UTxOs.
 Hãy tưởng tượng ví của các bạn giống như một con heo đất.
 Mỗi lần ai đó chuyển tiền cho bạn, họ nhét vào một tờ tiền.
 Nếu bạn nhận 100 lần mỗi lần 1 ADA, trong heo đất sẽ có 100 tờ 1 ADA.
 Khi bạn muốn mua một món đồ giá 90 ADA, bạn phải lôi 90 tờ tiền đó ra để trả.
 Việc đếm 90 tờ tiền tốn thời gian và công sức.
 Trong Blockchain, việc 'đếm' này tốn phí giao dịch (Fee) và dung lượng mạng.
-Bài hôm nay, chúng ta sẽ học cách đập heo đất, 
-gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
+Bài hôm nay, chúng ta sẽ học cách gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
 Kỹ thuật này gọi là Consolidate UTxO.
 
 Bước 1: Khởi tạo môi trường ảo
@@ -32,7 +30,7 @@ Khi đã ở trong môi trường (venv), việc cài đặt thư viện diễn 
 Chạy lệnh:
 pip install pycardano blockfrost-python
 
-Bước 4 setup các biến môi trường bên trong .env bao gồm blockfrost API Key, mnemonic,...
+Bước 4 : Tạo file .env và điền biến môi trường
 
 """
 
@@ -41,6 +39,7 @@ import sys
 from blockfrost import ApiError, ApiUrls, BlockFrostApi
 from dotenv import load_dotenv
 from pycardano import *
+import time
 # === BƯỚC 1: CẤU HÌNH MÔI TRƯỜNG ===
 # Tải biến môi trường
 load_dotenv()
@@ -148,18 +147,59 @@ builder = TransactionBuilder(cardano)
 # Trong bài học Consolidate, mục đích của chúng ta là DỌN NHÀ. Chúng ta muốn ép buộc giao dịch phải "ăn" tất cả mọi thứ đang có, dù là những đồng vụn vặt nhất (Dust).
 
 # Bằng cách viết vòng lặp for, chúng ta ra lệnh: "Tôi không quan tâm cần bao nhiêu, hãy lấy HẾT tất cả những gì tôi tìm thấy và ném vào lò lửa (Input)."
-for utxo in utxos:
+# === BẮT ĐẦU VÒNG LẶP XỬ LÝ UTXO ===
+print(f"\n--- TÌM THẤY {len(utxos)} UTXO. BẮT ĐẦU GỘP... ---")
+# Để add từng UTxO vào Builder chúng ta phải xử lý thủ công từng bước chúng ta phải khởi tạo
+# Từng UTXO bao gồm:
+# - TransactionInput (tham chiếu đến mã giao dịch + index)
+# - TransactionOutput (địa chỉ + giá trị)
+# Dưới đây là quy trình chi tiết cho mỗi UTxO:
+for i, utxo in enumerate(utxos):
+    # --- PHẦN IN THÔNG TIN (LOGGING) ---
+    print(f"\n[{i+1}/{len(utxos)}] UTxO: {utxo.tx_hash} #Index:{utxo.tx_index}")
+    
+    # 1. Tạo Input
     tx_input = TransactionInput.from_primitive([utxo.tx_hash, utxo.tx_index])
-    print(f"UTXO:{utxo.tx_hash}#index: {utxo.tx_index} ")
-    # Xử lý UTxO đa tài sản
-    value = Value.from_primitive(
-        [int(utxo.amount[0].quantity)] + [
-            (asset.unit, int(asset.quantity)) for asset in utxo.amount[1:] if asset.unit != "lovelace"
-        ]
-    )
+    
+    # 2. Xử lý Value & In chi tiết tài sản
+    lovelace_amount = 0
+    multi_assets = {} 
+
+    for asset in utxo.amount:
+        if asset.unit == "lovelace":
+            lovelace_amount = int(asset.quantity)
+            print(f"   └── {lovelace_amount / 1_000_000:,.6f} ADA") # In ra số ADA đã format
+        else:
+            # Tách PolicyID và AssetName
+            policy_id = asset.unit[:56]
+            asset_name_hex = asset.unit[56:] 
+            quantity = int(asset.quantity)
+
+            # Cố gắng dịch tên Token từ Hex sang chữ cái (ASCII) cho dễ đọc
+            try:
+                asset_name_str = bytes.fromhex(asset_name_hex).decode("utf-8")
+            except:
+                asset_name_str = f"(Hex) {asset_name_hex}" # Nếu không dịch được thì để nguyên Hex
+
+            print(f"   └── Token: {asset_name_str} (SL: {quantity:,}) - [Policy: {policy_id[:8]}...]")
+
+            # Thêm vào dictionary cho Value
+            if policy_id not in multi_assets:
+                multi_assets[policy_id] = {}
+            multi_assets[policy_id][asset_name_hex] = quantity
+
+    # 3. Tạo Value object
+    if multi_assets:
+        value = Value.from_primitive([lovelace_amount, multi_assets])
+    else:
+        value = Value.from_primitive([lovelace_amount])
+
+    # 4. Thêm vào Builder
     tx_output = TransactionOutput(main_address, value)
     utxo_obj = UTxO(tx_input, tx_output)
     builder.add_input(utxo_obj)
+
+print("\n--- ĐÃ THÊM TẤT CẢ VÀO BUILDER ---")
 
 # Không thêm output cụ thể: để builder tự cân bằng (phí + 1 output đổi) về địa chỉ
 # === BƯỚC 5: TÍNH TOÁN VÀ KÝ ===
@@ -195,3 +235,55 @@ except Exception as e:
         print("Giao dịch không được cân bằng. Đầu vào và đầu ra (+phí) không khớp.")
     else:
         print(e)
+
+# === BƯỚC 7: CHỜ XÁC NHẬN VÀ HIỂN THỊ KẾT QUẢ MỚI ===
+print("\n--- ĐANG CHỜ GIAO DỊCH ĐƯỢC XÁC NHẬN TRÊN ON-CHAIN ---")
+print("Quá trình này có thể mất từ 20 giây đến 2 phút. Vui lòng không tắt script...")
+
+def wait_for_tx(tx_hash):
+    """Hàm chờ giao dịch được xác nhận bởi Blockfrost"""
+    for i in range(30):  # Thử 30 lần, mỗi lần nghỉ 10s (Tổng 5 phút timeout)
+        try:
+            # Thử lấy thông tin giao dịch
+            tx_detail = api.transaction(tx_hash)
+            if tx_detail:
+                print(f"Giao dịch đã được xác nhận tại Block: {tx_detail.block}")
+                return True
+        except ApiError:
+            # Nếu lỗi 404 nghĩa là chưa tìm thấy, chờ tiếp
+            print(f"[{i+1}/30] Chưa thấy giao dịch, đợi thêm 10s...")
+            time.sleep(10)
+    return False
+
+# 1. Chờ giao dịch confirm
+if wait_for_tx(tx_id):
+    print("\n--- ĐANG CẬP NHẬT LẠI DANH SÁCH UTXO ---")
+    # Đợi thêm 5s để đảm bảo Blockfrost đã index xong phần UTxO
+    time.sleep(5) 
+    
+    # 2. Lấy lại danh sách UTxO mới
+    try:
+        new_utxos = api.address_utxos(main_address)
+        print(f"HOÀN TẤT! Số lượng UTxO hiện tại: {len(new_utxos)}")
+        
+        # In ra UTxO duy nhất còn lại
+        for utxo in new_utxos:
+            print(f"UTXO MỚI: {utxo.tx_hash} #Index:{utxo.tx_index}")
+            total_ada = 0
+            print("   Tài sản bên trong:")
+            for asset in utxo.amount:
+                if asset.unit == "lovelace":
+                    total_ada = int(asset.quantity) / 1_000_000
+                    print(f"{total_ada:,.6f} ADA")
+                else:
+                    # Decode tên token cho đẹp
+                    try:
+                        name = bytes.fromhex(asset.unit[56:]).decode("utf-8")
+                    except:
+                        name = asset.unit[56:]
+                    print(f"   - {name}: {int(asset.quantity):,}")
+                    
+    except Exception as e:
+        print(f"Lỗi khi lấy UTxO mới: {e}")
+else:
+    print("Quá thời gian chờ (Timeout). Hãy kiểm tra thủ công trên Cardanoscan.")
