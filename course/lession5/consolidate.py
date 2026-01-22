@@ -12,7 +12,8 @@ Nếu bạn nhận 100 lần mỗi lần 1 ADA, trong heo đất sẽ có 100 t�
 Khi bạn muốn mua một món đồ giá 90 ADA, bạn phải lôi 90 tờ tiền đó ra để trả.
 Việc đếm 90 tờ tiền tốn thời gian và công sức.
 Trong Blockchain, việc 'đếm' này tốn phí giao dịch (Fee) và dung lượng mạng.
-Bài hôm nay, chúng ta sẽ học cách đập heo đất, gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
+Bài hôm nay, chúng ta sẽ học cách đập heo đất, 
+gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
 Kỹ thuật này gọi là Consolidate UTxO.
 
 Điểm mấu chốt: thay vì dùng `add_input_address` (chọn UTxO tối ưu), script này
@@ -131,6 +132,7 @@ builder = TransactionBuilder(cardano)
 # Thêm tất cả UTxO làm đầu vào (không dùng add_input_address để đảm bảo gom hết)
 for utxo in utxos:
     tx_input = TransactionInput.from_primitive([utxo.tx_hash, utxo.tx_index])
+    print(f"UTXO:{utxo.tx_hash}#index: {utxo.tx_index} ")
     # Xử lý UTxO đa tài sản
     value = Value.from_primitive(
         [int(utxo.amount[0].quantity)] + [
