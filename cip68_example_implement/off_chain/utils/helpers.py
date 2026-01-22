@@ -2,11 +2,9 @@
 Utility functions cho CIP-68 implementation
 """
 import json
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
-
-from fractions import Fraction
 
 from pycardano import (
     PlutusV3Script,
@@ -23,100 +21,6 @@ from pycardano import (
 from pycardano import crypto
 from mnemonic import Mnemonic
 import config
-
-
-def sync_protocol_parameters(chain_context):
-    """Ensure protocol parameters from Blockfrost use exact rational values."""
-    # Force fetch of latest parameters to avoid Blockfrost cache staleness
-    chain_context._protocol_param = None  # Accessing protected member on purpose
-
-    raw_params = chain_context.api.epoch_latest_parameters()
-    precise_price_mem = Fraction(str(raw_params.price_mem))
-    precise_price_step = Fraction(str(raw_params.price_step))
-
-    # Normalize cost models to ledger order (use raw arrays where available)
-    language_names = ("PlutusV1", "PlutusV2", "PlutusV3")
-    raw_cost_models_attr = getattr(raw_params, "cost_models_raw", None)
-    raw_cost_models = {}
-    if raw_cost_models_attr:
-        raw_cost_models = {
-            language: list(values)
-            for language, values in vars(raw_cost_models_attr).items()
-            if isinstance(values, list)
-        }
-
-    normalized_cost_models = {}
-    raw_cost_models_dict = (
-        raw_params.cost_models.to_dict() if hasattr(raw_params.cost_models, "to_dict") else {}
-    )
-    for language_name in language_names:
-        if language_name in raw_cost_models:
-            normalized_cost_models[language_name] = {
-                position: int(value)
-                for position, value in enumerate(raw_cost_models[language_name])
-            }
-        elif language_name in raw_cost_models_dict:
-            sorted_values = [value for _, value in sorted(raw_cost_models_dict[language_name].items())]
-            normalized_cost_models[language_name] = {
-                position: int(value)
-                for position, value in enumerate(sorted_values)
-            }
-
-    current_params = chain_context.protocol_param
-
-    if (
-        current_params.price_mem != precise_price_mem
-        or current_params.price_step != precise_price_step
-        or (normalized_cost_models and current_params.cost_models != normalized_cost_models)
-    ):
-        chain_context._protocol_param = replace(  # Accessing protected member on purpose
-            current_params,
-            price_mem=precise_price_mem,
-            price_step=precise_price_step,
-            cost_models=normalized_cost_models or current_params.cost_models,
-        )
-
-
-@dataclass
-class CIP68MetadataPlutus(PlutusData):
-    """CIP-68 metadata structure as PlutusData."""
-
-    CONSTR_ID = 0
-
-    name: bytes
-    image: bytes
-    description: bytes
-    attributes: List[List[bytes]]
-    media_type: bytes
-    files: List[bytes]
-
-
-@dataclass
-class CIP68UpdateRedeemerData(PlutusData):
-    """Redeemer payload for updating metadata."""
-
-    CONSTR_ID = 0
-
-    new_metadata: CIP68MetadataPlutus
-    token_name: bytes
-
-
-@dataclass
-class CIP68RedeemerUpdate(PlutusData):
-    """Action redeemer wrapping update payload."""
-
-    CONSTR_ID = 0
-
-    update: CIP68UpdateRedeemerData
-
-
-@dataclass
-class CIP68RedeemerBurn(PlutusData):
-    """Action redeemer for burning both CIP-68 tokens."""
-
-    CONSTR_ID = 1
-
-    token_name: bytes
 
 
 def generate_or_load_wallet(filename: str) -> Tuple[ExtendedSigningKey, ExtendedVerificationKey, bytes, Address]:
@@ -233,7 +137,7 @@ def create_cip68_datum(metadata: dict) -> PlutusData:
     from cbor2 import CBORTag
     
     # Parse attributes
-    attributes: List[List[bytes]] = []
+    attributes = []
     if "attributes" in metadata and metadata["attributes"]:
         for attr in metadata["attributes"]:
             trait_type = attr.get("trait_type", "")

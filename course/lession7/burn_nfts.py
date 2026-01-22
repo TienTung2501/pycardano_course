@@ -122,6 +122,7 @@ policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
 
+# Tạo MultiAsset để burn NFTs
 my_asset = Asset()
 my_nft = MultiAsset()
 
@@ -134,9 +135,11 @@ for asset in assets:
     nft1 = AssetName(asset_name_bytes)
     my_asset[nft1] = -1  # Giá trị âm để burn NFT
     asset_burned.append(asset_name)
-
+# Thêm asset vào MultiAsset dưới policy_id
 my_nft[policy_id] = my_asset
+# Thêm native_scripts và mint vào builder
 builder.native_scripts = native_scripts
+# Đặt MultiAsset với giá trị âm để burn NFTs
 builder.mint = my_nft
 
 

@@ -153,7 +153,19 @@ policy = ScriptAll([pub_key_policy])
 policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
-
+#3: Tạo MultiAsset để burn NFTs
+# Lý do là vì một giao dịch trên Cardano có thể cùng lúc xử lý nhiều loại token từ nhiều Policy khác nhau (gọi là Multi-asset transaction).
+# MultiAsset = {
+#     "POLICY_ID_A": {   <-- Đây là đối tượng Asset 1
+#         "Token_Coin": 10,
+#         "Token_NFT": 2
+#     },
+#     "POLICY_ID_B": {   <-- Đây là đối tượng Asset 2
+#         "Token_Coin": 5
+#     }
+# }
+# Asset là một phần của MultiAsset, đại diện cho các token cụ thể dưới một policy_id nhất định.
+# Để mint/ Burn token, ta cần tạo một đối tượng MultiAsset chứa Asset với số lượng âm (để burn).
 my_asset = Asset()
 my_nft = MultiAsset()
 
@@ -176,14 +188,16 @@ for asset in assets:
     nft1 = AssetName(asset_name_bytes)  # token name = tên NFT
     my_asset[nft1] = 1
 
-
+# Thêm asset vào MultiAsset dưới policy_id
 my_nft[policy_id] = my_asset
+# Thêm native_scripts và mint vào builder
 builder.native_scripts = native_scripts
 
 # Gắn metadata vào auxiliary data (Alonzo)
 auxiliary_data = AuxiliaryData(AlonzoMetadata(metadata=Metadata(metadata)))
 builder.auxiliary_data = auxiliary_data
 
+# Đặt MultiAsset với giá trị dương để mint NFTs
 builder.mint = my_nft
 
 # Min-ADA cho output chứa nhiều NFT

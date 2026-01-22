@@ -38,10 +38,6 @@ from utils.helpers import (
     build_token_name,
     create_cip68_datum,
     apply_params_to_script,
-    sync_protocol_parameters,
-    CIP68MetadataPlutus,
-    CIP68UpdateRedeemerData,
-    CIP68RedeemerUpdate,
 )
 
 
@@ -78,8 +74,14 @@ def main():
         project_id=config.BLOCKFROST_PROJECT_ID,
         base_url=config.BLOCKFROST_URL,
     )
-    sync_protocol_parameters(context)
-    print("    [OK] Protocol parameters đã được đồng bộ chính xác")
+    # FIX: Ép BlockFrost lấy Protocol Parameters MỚI NHẤT
+    # → Tránh lỗi "PPViewHashesDontMatch" khi dùng Plutus script
+    # Giải thích:
+    # - Cardano yêu cầu transaction phải khớp hash của Protocol Parameters (PP)
+    # - BlockFrost cache PP cũ → nếu PP trên mạng thay đổi → hash sai → lỗi
+    # - Dòng này xóa cache → buộc query API mới nhất mỗi lần build tx
+    context._protocol_param = None
+    print("    [OK] Protocol parameters sẽ được cập nhật mới nhất")
     # 2. Load user wallet (who owns the user token)
     print("\n[2] Loading user wallet...")
     user_skey, user_vkey, _, user_addr = generate_or_load_wallet('user.mnemonic')
@@ -108,7 +110,7 @@ def main():
     # 5. Find reference token UTxO at script
     print("\n[4] Finding reference token at script...")
     script_utxos = context.utxos(script_addr)
-
+    
     ref_utxo = None
     for utxo in script_utxos:
         if not utxo.output.amount.multi_asset:
@@ -120,11 +122,7 @@ def main():
                         ref_utxo = utxo
                         print(f"    [OK] Found: {utxo.input.transaction_id}#{utxo.input.index}")
                         break
-                if ref_utxo:
-                    break
-        if ref_utxo:
-            break
-
+    
     if not ref_utxo:
         print("    [ERROR] Reference token not found!")
         return
@@ -144,11 +142,7 @@ def main():
                         user_utxo = utxo
                         print(f"    [OK] Found: {utxo.input.transaction_id}#{utxo.input.index}")
                         break
-                if user_utxo:
-                    break
-        if user_utxo:
-            break
-
+    
     if not user_utxo:
         print("    [ERROR] User token not found! Cannot prove ownership.")
         return
@@ -167,39 +161,36 @@ def main():
     # 8. Create redeemer
     print("\n[7] Creating redeemer...")
     # Redeemer structure: { new_metadata: CIP68Metadata, token_name: ByteArray }
+    from pycardano import RawCBOR
+    import cbor2
+    from cbor2 import CBORTag
+    
+    # Build redeemer: Constructor 0 with [new_metadata, token_name]
+    # new_metadata is the full CIP68Metadata structure (Constructor 0 with 6 fields)
+    
+    # Get metadata CBOR (already encoded in create_cip68_datum)
     metadata_cbor_bytes = new_datum.cbor
-    metadata_plutus = CIP68MetadataPlutus.from_cbor(metadata_cbor_bytes)
-    redeemer_data = CIP68RedeemerUpdate(
-        CIP68UpdateRedeemerData(
-            new_metadata=metadata_plutus,
-            token_name=args.name.encode('utf-8'),
-        )
-    )
-    redeemer = Redeemer(redeemer_data)
+    metadata_decoded = cbor2.loads(metadata_cbor_bytes)
+    
+    # Build redeemer structure
+    redeemer_cbor = CBORTag(121, [
+        metadata_decoded,  # Full metadata structure
+        args.name.encode('utf-8'),  # token_name
+    ])
+    
+    redeemer = Redeemer(RawCBOR(cbor2.dumps(redeemer_cbor)))
     
     # 9. Build transaction
     print("\n[8] Building update transaction...")
     builder = TransactionBuilder(context)
-
-    ada_only_utxos = sorted(
-        (u for u in user_utxos if not u.output.amount.multi_asset),
-        key=lambda u: u.output.amount.coin,
-        reverse=True,
-    )
-    if not ada_only_utxos:
-        print("    [ERROR] No pure ADA UTxO found for collateral. Please top up wallet.")
-        return
-
-    collateral_utxo = ada_only_utxos[0]
-    builder.collaterals.append(collateral_utxo)
-
-    fee_utxo = next((u for u in ada_only_utxos if u.input != collateral_utxo.input), None)
-
-    if fee_utxo:
-        builder.add_input(fee_utxo)
-    else:
-        print("    [WARN] Only one ADA-only UTxO available. Reusing collateral UTxO for fees.")
-        builder.add_input(collateral_utxo)
+    # Add collateral for Plutus script execution
+    non_nft_utxos = [u for u in context.utxos(user_addr) 
+                     if not u.output.amount.multi_asset]
+    if non_nft_utxos:
+        builder.collaterals.append(non_nft_utxos[0])
+    
+    # Add user wallet input for fees
+    builder.add_input_address(user_addr)
     
     # IMPORTANT: Add user token UTxO as input (to prove ownership)
     builder.add_input(user_utxo)

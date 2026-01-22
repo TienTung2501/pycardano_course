@@ -88,12 +88,39 @@ if not exists(policy_skey_path) or not exists(policy_vkey_path):
     payment_verification_key = payment_key_pair.verification_key
     payment_signing_key.save(policy_skey_path)
     payment_verification_key.save(policy_vkey_path)
+# Tại sao cần: policy signing key để ký giao dịch mint; policy verifying key để tạo script.
+# Để đúc (mint) token, mạng lưới Cardano cần biết "Ai là người có quyền đúc?".
+# Bạn cần một cặp khóa chuyên biệt cho việc này, gọi là Policy Keys.
+
+# Trên cardano, mỗi token được xác định duy nhất bởi một cặp thông tin:
+# 1) policy_id: định danh chính sách (chính sách xác định quyền đúc token)
+# 2) asset_name: tên tài sản (có thể là chuỗi ký tự bất kỳ, mã hóa dưới dạng bytes)
+# Việc kết hợp policy_id và asset_name tạo nên định danh duy nhất cho mỗi token trên mạng lưới.
+# Ví dụ, bạn có thể có nhiều token với cùng tên asset_name nhưng khác policy_id,
+# hoặc cùng policy_id nhưng khác asset_name. Sự kết hợp này giúp phân biệt và quản lý các token một cách hiệu quả trên Cardano.
+# policy_id được tạo ra từ hash của Native Script, trong đó chứa khóa công khai của policy.
+
+# Policy ID được xây dựng dựa trên khóa công khai (verification key) của policy
+# và được mã hóa trong một script gọi là Native Script.
+# Khi bạn muốn đúc thêm token, bạn phải ký giao dịch bằng khóa bí mật (signing key) tương ứng với khóa công khai đã dùng trong script.
+# Nếu không có khóa bí mật này, bạn sẽ không thể đúc thêm token theo chính sách đã định.
+# Điều này đảm bảo rằng chỉ những người sở hữu khóa bí mật mới có quyền đúc token theo chính sách đó,
+# từ đó bảo vệ tính toàn vẹn và kiểm soát của token trên mạng lưới Cardano.
+# Việc lưu trữ khóa trong thư mục `keys/` giúp bạn dễ dàng quản lý và sử dụng chúng khi cần thiết.
+# Nếu bạn mất khóa này, bạn sẽ không thể đúc thêm token theo chính sách đã định.
+# Do đó, việc bảo vệ và sao lưu khóa là rất quan trọng.
+# Việc tạo khóa một lần và tái sử dụng chúng giúp duy trì tính liên tục trong việc quản lý token.
+
+
 
 # Tải khóa chính sách và dựng policy script (ScriptPubkey → ScriptAll)
+#1: Tải khóa từ tệp
 policy_signing_key = PaymentSigningKey.load(policy_skey_path)
+#2: Tạo ScriptPubkey và ScriptAll
 policy_verification_key = PaymentVerificationKey.load(policy_vkey_path)
 pub_key_policy = ScriptPubkey(policy_verification_key.hash())
 policy = ScriptAll([pub_key_policy])
+#3: Lấy policy_id
 policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
@@ -109,18 +136,6 @@ multiasset[policy_id] = new_asset
 
 # Tạo TransactionBuilder và cấu hình minting
 builder = TransactionBuilder(cardano)
-
-# # Thêm tất cả UTxO làm đầu vào thủ công
-# for utxo in utxos:
-#     tx_input = TransactionInput.from_primitive([utxo.tx_hash, utxo.tx_index])
-#     value = Value.from_primitive(
-#         [int(utxo.amount[0].quantity)] + [
-#             (asset.unit, int(asset.quantity)) for asset in utxo.amount[1:] if asset.unit != "lovelace"
-#         ]
-#     )
-#     tx_output = TransactionOutput(main_address, value)
-#     utxo_obj = UTxO(tx_input, tx_output)
-#     builder.add_input(utxo_obj)
 
 builder.add_input_address(main_address)  # để builder tự chọn UTxO hợp lý
 # Thêm thông tin phát hành token
