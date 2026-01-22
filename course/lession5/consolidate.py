@@ -16,32 +16,24 @@ Bài hôm nay, chúng ta sẽ học cách đập heo đất,
 gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
 Kỹ thuật này gọi là Consolidate UTxO.
 
-Điểm mấu chốt: thay vì dùng `add_input_address` (chọn UTxO tối ưu), script này
-chủ động add từng UTxO làm input để "gom" hết toàn bộ UTxO hiện có.
+Bước 1: Khởi tạo môi trường ảo
+Chạy lệnh sau để tạo thư mục venv chứa môi trường riêng:
+python3 -m venv venv
 
-1. Tại sao không dùng add_input_address (Tự động)?
-PyCardano (và hầu hết các thư viện ví) sử dụng thuật toán Coin Selection (Chọn đồng xu) khi bạn dùng hàm tự động.
 
-Mục tiêu của Tự động: Là sự TIẾT KIỆM và TỐI ƯU.
+Bước 2: Kích hoạt môi trường (Activate)
+Đây là điểm khác biệt chính so với Windows. Trên Linux/Ubuntu, bạn dùng lệnh source:
+source venv/bin/activate
 
-Nó chỉ nhặt ra vừa đủ số UTxO cần thiết để trả cho số tiền bạn muốn gửi + phí.
 
-Nó sẽ bỏ qua các UTxO còn lại để tiết kiệm phí giao dịch (vì giao dịch càng nhiều đầu vào thì kích thước càng lớn, phí càng cao).
+Khi thành công, bạn sẽ thấy tên môi trường (venv) xuất hiện phía trước dấu nhắc lệnh (prompt) trong terminal.
+Bước 3. Cài đặt thư viện PyCardano
+Khi đã ở trong môi trường (venv), việc cài đặt thư viện diễn ra rất nhanh chóng và an toàn.
+Chạy lệnh:
+pip install pycardano blockfrost-python
 
-Ví dụ: Ví bạn có 100 tờ 1 ADA (Tổng 100 ADA).
+Bước 4 setup các biến môi trường bên trong .env bao gồm blockfrost API Key, mnemonic,...
 
-Nếu bạn dùng lệnh tự động gửi 5 ADA.
-
-Thư viện sẽ chỉ nhặt 5 tờ 1 ADA.
-
-Kết quả: Ví bạn còn lại 95 tờ tiền lẻ. Mục tiêu "Gom UTxO" (Consolidate) THẤT BẠI.
-
-2. Tại sao phải dùng Loop add_input từng cái (Thủ công)?
-Mục tiêu của Thủ công: Là sự KIỂM SOÁT TUYỆT ĐỐI.
-
-Trong bài học Consolidate, mục đích của chúng ta là DỌN NHÀ. Chúng ta muốn ép buộc giao dịch phải "ăn" tất cả mọi thứ đang có, dù là những đồng vụn vặt nhất (Dust).
-
-Bằng cách viết vòng lặp for, chúng ta ra lệnh: "Tôi không quan tâm cần bao nhiêu, hãy lấy HẾT tất cả những gì tôi tìm thấy và ném vào lò lửa (Input)."
 """
 
 import os
@@ -130,6 +122,32 @@ cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_ur
 builder = TransactionBuilder(cardano)
 
 # Thêm tất cả UTxO làm đầu vào (không dùng add_input_address để đảm bảo gom hết)
+# Điểm mấu chốt: thay vì dùng `add_input_address` (chọn UTxO tối ưu), script này
+# chủ động add từng UTxO làm input để "gom" hết toàn bộ UTxO hiện có.
+
+# 1. Tại sao không dùng add_input_address (Tự động)?
+# PyCardano (và hầu hết các thư viện ví) sử dụng thuật toán Coin Selection (Chọn đồng xu) khi bạn dùng hàm tự động.
+
+# Mục tiêu của Tự động: Là sự TIẾT KIỆM và TỐI ƯU.
+
+# Nó chỉ nhặt ra vừa đủ số UTxO cần thiết để trả cho số tiền bạn muốn gửi + phí.
+
+# Nó sẽ bỏ qua các UTxO còn lại để tiết kiệm phí giao dịch (vì giao dịch càng nhiều đầu vào thì kích thước càng lớn, phí càng cao).
+
+# Ví dụ: Ví bạn có 100 tờ 1 ADA (Tổng 100 ADA).
+
+# Nếu bạn dùng lệnh tự động gửi 5 ADA.
+
+# Thư viện sẽ chỉ nhặt 5 tờ 1 ADA.
+
+# Kết quả: Ví bạn còn lại 95 tờ tiền lẻ. Mục tiêu "Gom UTxO" (Consolidate) THẤT BẠI.
+
+# 2. Tại sao phải dùng Loop add_input từng cái (Thủ công)?
+# Mục tiêu của Thủ công: Là sự KIỂM SOÁT TUYỆT ĐỐI.
+
+# Trong bài học Consolidate, mục đích của chúng ta là DỌN NHÀ. Chúng ta muốn ép buộc giao dịch phải "ăn" tất cả mọi thứ đang có, dù là những đồng vụn vặt nhất (Dust).
+
+# Bằng cách viết vòng lặp for, chúng ta ra lệnh: "Tôi không quan tâm cần bao nhiêu, hãy lấy HẾT tất cả những gì tôi tìm thấy và ném vào lò lửa (Input)."
 for utxo in utxos:
     tx_input = TransactionInput.from_primitive([utxo.tx_hash, utxo.tx_index])
     print(f"UTXO:{utxo.tx_hash}#index: {utxo.tx_index} ")
