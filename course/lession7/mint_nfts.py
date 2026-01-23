@@ -1,33 +1,16 @@
-import os
-import random
-import sys
 """
+Xin chào mọi người, chào mừng đến với bài học thứ 7 
+trong chuỗi hướng dẫn Pycardano của tôi!
+Thì trong bài học này, chúng ta sẽ tìm hiểu cách
+
 Lesson 7 — Mint Multiple NFTs with CIP-721 metadata
+(Với mint 1 NFT tương tự chỉ khác cách tạo metadata và multiasset)
 
 Mục tiêu: Đúc nhiều NFT (mỗi cái = 1) với metadata 721 và trả về ví người phát hành.
+Với Token số lượng > 1 thì tương tự như bài trước.
+Với NFT số lượng = 1, mỗi NFT có metadata riêng.
 
-Luồng chính:
-1) Đọc .env, thiết lập mạng và ví từ mnemonic.
-2) Tạo/tải policy keys (ScriptPubkey → ScriptAll) và policy_id.
-3) Dựng metadata CIP-721: { 721: { policy_id_hex: { asset_name: {...fields} } } }.
-4) Dựng Asset/AssetName cho từng NFT (= 1) vào MultiAsset.
-5) Tính min-ADA cho output chứa tất cả NFT, add_output → build_and_sign → submit.
-"""
-
-from os.path import exists
-
-from blockfrost import ApiError, ApiUrls, BlockFrostApi, BlockFrostIPFS
-from dotenv import load_dotenv
-
-from pycardano import *
-
-# Nạp biến môi trường
-load_dotenv()
-network = os.getenv("BLOCKFROST_NETWORK")
-wallet_mnemonic = os.getenv("MNEMONIC")
-blockfrost_api_key = os.getenv("BLOCKFROST_PROJECT_ID")
-
-
+Data mẫu NFT (có thể mở rộng thêm):
 types = ["lion", "elephant", "panda", "sloth", "tiger", "wolf"]  # ví dụ thuộc tính
 
 assets = [
@@ -72,6 +55,23 @@ assets = [
         "type": random.choice(types),
     },
 ]
+"""
+import os
+import random
+import sys
+from os.path import exists
+
+from blockfrost import ApiError, ApiUrls, BlockFrostApi, BlockFrostIPFS
+from dotenv import load_dotenv
+
+from pycardano import *
+
+# Nạp biến môi trường
+load_dotenv()
+network = os.getenv("BLOCKFROST_NETWORK")
+wallet_mnemonic = os.getenv("MNEMONIC")
+blockfrost_api_key = os.getenv("BLOCKFROST_PROJECT_ID")
+
 
 
 # Map network (testnet → preview)
@@ -153,24 +153,47 @@ policy = ScriptAll([pub_key_policy])
 policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
-#3: Tạo MultiAsset để burn NFTs
-# Lý do là vì một giao dịch trên Cardano có thể cùng lúc xử lý nhiều loại token từ nhiều Policy khác nhau (gọi là Multi-asset transaction).
-# MultiAsset = {
-#     "POLICY_ID_A": {   <-- Đây là đối tượng Asset 1
-#         "Token_Coin": 10,
-#         "Token_NFT": 2
-#     },
-#     "POLICY_ID_B": {   <-- Đây là đối tượng Asset 2
-#         "Token_Coin": 5
-#     }
-# }
-# Asset là một phần của MultiAsset, đại diện cho các token cụ thể dưới một policy_id nhất định.
-# Để mint/ Burn token, ta cần tạo một đối tượng MultiAsset chứa Asset với số lượng âm (để burn).
+# ======================================================
+# 8. GIẢI THÍCH: NFT TRÊN CARDANO LÀ GÌ?
+# ======================================================
+# Cardano KHÔNG có chuẩn ERC-721 riêng.
+#
+# NFT trên Cardano thực chất là:
+# - Native Token
+# - Có supply = 1
+# - Có metadata theo chuẩn CIP-721
+#
+# FT và NFT dùng CHUNG cơ chế mint.
+# Sự khác biệt chỉ nằm ở:
+# - Số lượng
+# - Metadata
+# ======================================================
+
 my_asset = Asset()
 my_nft = MultiAsset()
 
 # Dựng metadata CIP-721
 metadata = {721: {policy_id_hex: {}}}
+
+# ======================================================
+# 11. TẠO METADATA CIP-721
+# ======================================================
+# Cấu trúc:
+# {
+#   721: {
+#     policy_id: {
+#       asset_name: { ...metadata }
+#     }
+#   }
+# }
+
+# 12. TẠO MULTIASSET ĐỂ MINT NFT
+# (Mint NFT khác với FT ở chỗ: mỗi NFT có supply = 1 và metadata riêng)
+# Vì vậy trong phần này mình sẽ không giải thích chi tiết cách tạo asset
+# vì tương tự như phần mint token trong bài trước.
+# ======================================================
+# quantity = 1  → NFT
+# quantity > 1  → FT
 
 asset_minted = []
 

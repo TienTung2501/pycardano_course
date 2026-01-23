@@ -1,0 +1,45 @@
+{
+  "types": ["lion", "elephant", "panda", "sloth", "tiger", "wolf"],
+  "assets": [
+    {
+      "name": "Pycardano_test_NFT_001",
+      "attack": "{{1-70}}",
+      "speed": "{{1-70}}",
+      "defense": "{{1-70}}",
+      "health": "{{1-70}}",
+      "type": "{{types}}"
+    },
+    {
+      "name": "Pycardano_test_NFT_002",
+      "attack": "{{1-70}}",
+      "speed": "{{1-70}}",
+      "defense": "{{1-70}}",
+      "health": "{{1-70}}",
+      "type": "{{types}}"
+    },
+    {
+      "name": "Pycardano_test_NFT_003",
+      "attack": "{{1-70}}",
+      "speed": "{{1-70}}",
+      "defense": "{{1-70}}",
+      "health": "{{1-70}}",
+      "type": "{{types}}"
+    },
+    {
+      "name": "Pycardano_test_NFT_004",
+      "attack": "{{1-70}}",
+      "speed": "{{1-70}}",
+      "defense": "{{1-70}}",
+      "health": "{{1-70}}",
+      "type": "{{types}}"
+    },
+    {
+      "name": "Pycardano_test_NFT_005",
+      "attack": "{{1-70}}",
+      "speed": "{{1-70}}",
+      "defense": "{{1-70}}",
+      "health": "{{1-70}}",
+      "type": "{{types}}"
+    }
+  ]
+}

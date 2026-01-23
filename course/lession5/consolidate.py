@@ -1,18 +1,22 @@
 """
+Xin chào mọi người, chào mừng đến với bài học thứ 6 
+trong chuỗi hướng dẫn Pycardano của tôi!
+Thì trong bài học này, chúng ta sẽ tìm hiểu cách
+
 Lesson 5 — Consolidate UTxOs
 
-Mục tiêu: gộp tất cả UTxO của địa chỉ về một UTxO đổi duy nhất (giúp giảm số lượng
-UTxO và tối ưu phí ở các lần giao dịch sau).
+Mục tiêu: gộp tất cả UTxO của địa chỉ về một UTxO đổi duy nhất
+Trong giao dịch trên Cardano, mỗi lần bạn nhận tiền, 
+bạn sẽ nhận được một UTxO (Unspent Transaction Output) riêng biệt.
+Nếu bạn nhận nhiều lần, bạn sẽ có nhiều UTxO lẻ tẻ.
+Khi thực hiện giao dịch tiêu tiền, bạn phải sử dụng từng UTxO một.
+Điều này dẫn đến việc tạo ra nhiều đầu vào (inputs) trong giao dịch, 
+làm tăng kích thước giao dịch và phí giao dịch.
+Để tối ưu hóa, bạn có thể gộp (consolidate) 
+tất cả các UTxO lẻ thành một UTxO duy nhất.
+Điều này giúp giảm số lượng đầu vào trong các giao dịch tương lai, 
+tiết kiệm phí và làm cho việc quản lý tài sản trở nên dễ dàng hơn.
 
-Mọi người có thể hiểu đơn giản như sau:
-Hãy tưởng tượng ví của các bạn giống như một con heo đất.
-Mỗi lần ai đó chuyển tiền cho bạn, họ nhét vào một tờ tiền.
-Nếu bạn nhận 100 lần mỗi lần 1 ADA, trong heo đất sẽ có 100 tờ 1 ADA.
-Khi bạn muốn mua một món đồ giá 90 ADA, bạn phải lôi 90 tờ tiền đó ra để trả.
-Việc đếm 90 tờ tiền tốn thời gian và công sức.
-Trong Blockchain, việc 'đếm' này tốn phí giao dịch (Fee) và dung lượng mạng.
-Bài hôm nay, chúng ta sẽ học cách gom tất cả tiền lẻ đổi thành một tờ tiền mệnh giá lớn duy nhất. 
-Kỹ thuật này gọi là Consolidate UTxO.
 
 Bước 1: Khởi tạo môi trường ảo
 Chạy lệnh sau để tạo thư mục venv chứa môi trường riêng:
@@ -24,9 +28,11 @@ Bước 2: Kích hoạt môi trường (Activate)
 source venv/bin/activate
 
 
-Khi thành công, bạn sẽ thấy tên môi trường (venv) xuất hiện phía trước dấu nhắc lệnh (prompt) trong terminal.
+Khi thành công, bạn sẽ thấy tên môi trường (venv) 
+xuất hiện phía trước dấu nhắc lệnh (prompt) trong terminal.
 Bước 3. Cài đặt thư viện PyCardano
-Khi đã ở trong môi trường (venv), việc cài đặt thư viện diễn ra rất nhanh chóng và an toàn.
+Khi đã ở trong môi trường (venv), 
+việc cài đặt thư viện diễn ra rất nhanh chóng và an toàn.
 Chạy lệnh:
 pip install pycardano blockfrost-python
 
@@ -56,6 +62,9 @@ else:
     cardano_network = Network.MAINNET
 
 # === BƯỚC 2: KHÔI PHỤC VÍ TỪ MNEMONIC ===
+
+
+#=================Không nói đoạn này=======================
 # Giải thích về cơ chế ví của Cardano:
 # Trong bài học trước, mình đã chia sẻ khá chi tiết về lý thuyết ví trên Cardano. Ở video này, mình sẽ đi sâu vào code để các bạn thấy rõ cách nó hoạt động thực tế.
 # > Về cơ bản, ví Cardano sử dụng công nghệ HD Wallet (Ví phân cấp định danh). Quy trình khởi tạo diễn ra qua hai bước chuẩn:
@@ -69,12 +78,20 @@ else:
 # Mỗi ví HDWallet có thể tạo ra nhiều cặp khóa (key pair) và địa chỉ (address)
 # thông qua các đường dẫn phái sinh (derivation path) khác nhau.
 
+#=================Không nói đoạn này=======================
+
+
 # Tạo khóa từ mnemonic (payment/staking)
 #1: Khôi phục ví HDWallet ví phân cấp định danh từ mnemonic bằng chuẩn BIP-32
 new_wallet = crypto.bip32.HDWallet.from_mnemonic(wallet_mnemonic)
-#2: Tạo khóa thanh toán và khóa đặt cược từ ví HDWallet sử dụng đường dẫn phái sinh chuẩn Cardano
+
+#2: Tạo khóa thanh toán và khóa đặt cược từ ví 
+# HDWallet sử dụng đường dẫn phái sinh chuẩn Cardano
 payment_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/0/0")
 staking_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/2/0")
+
+
+#=================Không nói đoạn này=======================
 # Giải thích về các thành phần trong đường dẫn phái sinh (derivation path):
 # Thành phần,Mã số,Ý nghĩa,Giải thích:
 # m :Master Node -->"Gốc của cây, được tạo ra trực tiếp từ Seed (24 từ khóa)."
@@ -83,7 +100,10 @@ staking_key = new_wallet.derive_from_path(f"m/1852'/1815'/0'/2/0")
 # 0': Account -->Tài khoản,"Giống như các ngăn ví khác nhau. Bạn có thể tạo Account 0 cho bố, Account 1 (1') cho mẹ... chung trên 1 bộ 24 từ. Mặc định luôn dùng 0'."
 # 0 hoặc 2:Role --> Vai trò,Rất quan trọng! Xác định loại chìa khóa:  0: External (Payment) - Dùng để nhận tiền/tiêu tiền.  1: Internal (Change) - Ví ẩn dùng để nhận tiền thối lại.  2: Staking - Dùng để ủy thác vào Pool.
 # 0: Index -->Số thứ tự,"Địa chỉ thứ mấy trong chuỗi. 0 là địa chỉ đầu tiên, 1 là địa chỉ thứ 2... Có thể tạo ra hàng tỷ địa chỉ (index) khác nhau."
-#3: Chuyển đổi khóa sang định dạng ExtendedSigningKey của pycardano
+#=================Không nói đoạn này=======================
+
+
+#3: Tạo khóa để ký giao dịch cho cả payment và staking
 payment_skey = ExtendedSigningKey.from_hdwallet(payment_key)
 staking_skey = ExtendedSigningKey.from_hdwallet(staking_key)
 
@@ -112,7 +132,7 @@ except Exception as e:
         print(e.message)
         sys.exit(1)
 
-# Ngữ cảnh chuỗi để build/submit giao dịch
+
 # === BƯỚC 4: XÂY DỰNG GIAO DỊCH ===
 # Tạo context để builder biết thông tin mạng (slot, protocol param...)
 cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_url)
@@ -120,40 +140,27 @@ cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_ur
 # TransactionBuilder cho consolidate
 builder = TransactionBuilder(cardano)
 
-# Thêm tất cả UTxO làm đầu vào (không dùng add_input_address để đảm bảo gom hết)
-# Điểm mấu chốt: thay vì dùng `add_input_address` (chọn UTxO tối ưu), script này
-# chủ động add từng UTxO làm input để "gom" hết toàn bộ UTxO hiện có.
-
-# 1. Tại sao không dùng add_input_address (Tự động)?
-# PyCardano (và hầu hết các thư viện ví) sử dụng thuật toán Coin Selection (Chọn đồng xu) khi bạn dùng hàm tự động.
-
-# Mục tiêu của Tự động: Là sự TIẾT KIỆM và TỐI ƯU.
-
-# Nó chỉ nhặt ra vừa đủ số UTxO cần thiết để trả cho số tiền bạn muốn gửi + phí.
-
-# Nó sẽ bỏ qua các UTxO còn lại để tiết kiệm phí giao dịch (vì giao dịch càng nhiều đầu vào thì kích thước càng lớn, phí càng cao).
-
-# Ví dụ: Ví bạn có 100 tờ 1 ADA (Tổng 100 ADA).
-
-# Nếu bạn dùng lệnh tự động gửi 5 ADA.
-
-# Thư viện sẽ chỉ nhặt 5 tờ 1 ADA.
-
-# Kết quả: Ví bạn còn lại 95 tờ tiền lẻ. Mục tiêu "Gom UTxO" (Consolidate) THẤT BẠI.
-
-# 2. Tại sao phải dùng Loop add_input từng cái (Thủ công)?
-# Mục tiêu của Thủ công: Là sự KIỂM SOÁT TUYỆT ĐỐI.
-
-# Trong bài học Consolidate, mục đích của chúng ta là DỌN NHÀ. Chúng ta muốn ép buộc giao dịch phải "ăn" tất cả mọi thứ đang có, dù là những đồng vụn vặt nhất (Dust).
-
-# Bằng cách viết vòng lặp for, chúng ta ra lệnh: "Tôi không quan tâm cần bao nhiêu, hãy lấy HẾT tất cả những gì tôi tìm thấy và ném vào lò lửa (Input)."
+# Tiếp theo thêm tất cả UTxO vào transaction builder
+# Để add input ta có thể dùng 2 cách sau đây:
+# builder.add_input_address(main_address) 
+# # cách này sẽ tự động thêm UTxO của địa chỉ vào builder 
+# hạn chế đó là không kiểm soát được UTxO nào được thêm vào
+# builder.add_input(utxos)  
+# # cách này cho phép ta kiểm soát được UTxO nào được thêm vào 
+# vì là thực hiện consolidate nên cách này phù hợp hơn
+# cần xây tạo UTXO để truyền vào hàm add_input(utxo)
+# # Có một vấn đề đó là khi lấy utxo từ blockfrost api 
+# ta sẽ nhận được một danh sách các utxo 
+# nhưng đây là dữ liệu thô của blockfrost 
+# chưa phải là utxo object của pycardano
+# # Để tạo ra utxo nó sẽ có 2 thành phần chính là TransactionInput và TransactionOutput
+# # Trong transactionInput sẽ bao gồm tx_hash và tx_index
+# # Trong transactionOutput sẽ bao gồm address và value 
+# # chính vì thế mà mỗi một utxo sẽ được tạo ra từ 2 thành phần này
+# # Khi lấy utxo từ blockfrost api ta sẽ nhận được một danh sách các utxo
+# # Ta sẽ duyệt qua từng utxo trong danh sách và tạo TransactionInput và TransactionOutput
 # === BẮT ĐẦU VÒNG LẶP XỬ LÝ UTXO ===
 print(f"\n--- TÌM THẤY {len(utxos)} UTXO. BẮT ĐẦU GỘP... ---")
-# Để add từng UTxO vào Builder chúng ta phải xử lý thủ công từng bước chúng ta phải khởi tạo
-# Từng UTXO bao gồm:
-# - TransactionInput (tham chiếu đến mã giao dịch + index)
-# - TransactionOutput (địa chỉ + giá trị)
-# Dưới đây là quy trình chi tiết cho mỗi UTxO:
 for i, utxo in enumerate(utxos):
     # --- PHẦN IN THÔNG TIN (LOGGING) ---
     print(f"\n[{i+1}/{len(utxos)}] UTxO: {utxo.tx_hash} #Index:{utxo.tx_index}")
@@ -236,6 +243,17 @@ except Exception as e:
     else:
         print(e)
 
+# Khi chúng ta submit giao dịch, mặc dù submit đã thành công
+# nhưng phải mất một khoảng thời gian để giao dịch được xác nhận on-chain
+# chính vì thế mà nếu chúng ta query lại UTxO ngay lập tức
+# thì rất có thể giao dịch chưa được xác nhận kịp thời
+# Vì vậy chúng ta cần chờ một khoảng thời gian
+# sau đó mới query lại UTxO để lấy thông tin chính xác nhất
+# Để làm được điều này chúng ta sẽ viết hàm wait_for_tx bên dưới
+# hàm này sẽ lặp lại liên tục kiểm tra giao dịch đã được xác nhận hay chưa
+# cứ mỗi lần kiểm tra không thấy sẽ chờ 10 giây rồi kiểm tra lại
+# nếu đã được xác nhận thì hàm sẽ trả về True
+
 # === BƯỚC 7: CHỜ XÁC NHẬN VÀ HIỂN THỊ KẾT QUẢ MỚI ===
 print("\n--- ĐANG CHỜ GIAO DỊCH ĐƯỢC XÁC NHẬN TRÊN ON-CHAIN ---")
 print("Quá trình này có thể mất từ 20 giây đến 2 phút. Vui lòng không tắt script...")
@@ -255,7 +273,7 @@ def wait_for_tx(tx_hash):
             time.sleep(10)
     return False
 
-# 1. Chờ giao dịch confirm
+# 1. Gọi hàm chờ giao dịch được xác nhận
 if wait_for_tx(tx_id):
     print("\n--- ĐANG CẬP NHẬT LẠI DANH SÁCH UTXO ---")
     # Đợi thêm 5s để đảm bảo Blockfrost đã index xong phần UTxO

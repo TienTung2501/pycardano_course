@@ -1,10 +1,34 @@
 """
+Xin chào mọi người, chào mừng đến với bài học thứ 7 
+trong chuỗi hướng dẫn Pycardano của tôi!
+Thì trong bài học này, chúng ta sẽ tìm hiểu cách
+
 Lesson 7 — Burn NFTs
 
 Mục tiêu: Burn (đốt) một danh sách NFT đã phát hành trước đó bằng cùng policy key.
 
 Nguyên tắc: số lượng âm trong `Asset` (ví dụ -1) biểu thị burn. Cần policy signing key
 khớp với khi mint.
+Chuẩn bị data mẫu NFT (tên asset):
+types = ["lion", "elephant", "panda", "sloth", "tiger", "wolf"]
+
+assets = [
+    {
+        "name": "Pycardano_test_NFT_001",
+    },
+    {
+        "name": "Pycardano_test_NFT_002",
+    },
+    {
+        "name": "Pycardano_test_NFT_003",
+    },
+    {
+        "name": "Pycardano_test_NFT_004",
+    },
+    {
+        "name": "Pycardano_test_NFT_005",
+    },
+]
 """
 
 import os
@@ -122,7 +146,10 @@ policy_id = policy.hash()
 policy_id_hex = policy_id.payload.hex()
 native_scripts = [policy]
 
-# Tạo MultiAsset để burn NFTs
+# Tạo MultiAsset để burn NFTs 
+# Trong phần này mình sẽ không giải thích chi tiết cách tạo asset
+# vì tương tự như phần mint NFT trong bài trước.
+# Khác với mint chúng ta chỉ cần tạo Asset với số -1 để burn.
 my_asset = Asset()
 my_nft = MultiAsset()
 
