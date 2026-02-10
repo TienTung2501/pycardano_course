@@ -12,7 +12,7 @@ Các bước chính:
 5) Thêm input address từ ví để bù phí, set required_signers = [owner].
 6) build_and_sign và submit_tx.
 """
-
+# import thư viện
 from dataclasses import dataclass
 import os
 import sys
@@ -28,9 +28,9 @@ network = os.getenv("BLOCKFROST_NETWORK")
 wallet_mnemonic = os.getenv("MNEMONIC")
 blockfrost_api_key = os.getenv("BLOCKFROST_PROJECT_ID")
 
-# Thiết lập mạng và URL API (testnet → preview)
+# Thiết lập mạng và URL API (testnet → preprod)
 if network == "testnet":
-    base_url = ApiUrls.preview.value
+    base_url = ApiUrls.preprod.value
     cardano_network = Network.TESTNET
 else:
     base_url = ApiUrls.mainnet.value
@@ -91,12 +91,13 @@ class HelloWorldDatum(PlutusData):
 # Tạo datum (owner = hash của payment verification key)
 owner_vkey = payment_skey.to_verification_key()
 owner_hash = owner_vkey.hash()
-datum = HelloWorldDatum(owner=owner_hash.to_primitive())
+
+datum = HelloWorldDatum(owner=owner_hash.to_primitive()) # Tạo datum như owner hash bytes
 
 # Định nghĩa Redeemer class (Constr 0)
 @dataclass
-class HelloWorldRedeemer(PlutusData):
-    CONSTR_ID = 0
+class HelloWorldRedeemer(PlutusData):# Định nghĩa redeemer 
+    CONSTR_ID = 0 # Constr 0 
     msg: bytes
 
 # Tạo redeemer (msg = b"Hello, World!") và bọc trong Redeemer

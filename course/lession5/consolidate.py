@@ -1,15 +1,16 @@
 """
-Xin chào mọi người, chào mừng đến với bài học thứ 6 
-trong chuỗi hướng dẫn Pycardano của tôi!
+Xin chào mọi người, chào mừng mọi người đã đến với bài học thứ 6 
+trong chuỗi video hướng dẫn lập trình Pycardano của chúng tôi!
 Thì trong bài học này, chúng ta sẽ tìm hiểu cách
 
 Lesson 5 — Consolidate UTxOs
 
-Mục tiêu: gộp tất cả UTxO của địa chỉ về một UTxO đổi duy nhất
+Mục tiêu của kỹ thuật này đó là: gộp tất cả UTxO của địa chỉ về một UTxO duy nhất
+Như các bạn đã biết,
 Trong giao dịch trên Cardano, mỗi lần bạn nhận tiền, 
 bạn sẽ nhận được một UTxO (Unspent Transaction Output) riêng biệt.
 Nếu bạn nhận nhiều lần, bạn sẽ có nhiều UTxO lẻ tẻ.
-Khi thực hiện giao dịch tiêu tiền, bạn phải sử dụng từng UTxO một.
+
 Điều này dẫn đến việc tạo ra nhiều đầu vào (inputs) trong giao dịch, 
 làm tăng kích thước giao dịch và phí giao dịch.
 Để tối ưu hóa, bạn có thể gộp (consolidate) 
@@ -20,12 +21,12 @@ tiết kiệm phí và làm cho việc quản lý tài sản trở nên dễ dà
 
 Bước 1: Khởi tạo môi trường ảo
 Chạy lệnh sau để tạo thư mục venv chứa môi trường riêng:
-python3 -m venv venv
+python -m venv venv
 
 
 Bước 2: Kích hoạt môi trường (Activate)
 Đây là điểm khác biệt chính so với Windows. Trên Linux/Ubuntu, bạn dùng lệnh source:
-source venv/bin/activate
+.\venv\Scripts\Activate.ps1
 
 
 Khi thành công, bạn sẽ thấy tên môi trường (venv) 
@@ -34,7 +35,7 @@ Bước 3. Cài đặt thư viện PyCardano
 Khi đã ở trong môi trường (venv), 
 việc cài đặt thư viện diễn ra rất nhanh chóng và an toàn.
 Chạy lệnh:
-pip install pycardano blockfrost-python
+pip install pycardano blockfrost-python python-dotenv
 
 Bước 4 : Tạo file .env và điền biến môi trường
 
@@ -117,7 +118,8 @@ main_address = Address(
 print(f"Địa chỉ được tạo: {main_address}")
 # === BƯỚC 3: KẾT NỐI BLOCKFROST VÀ LẤY UTXO ===
 # Khởi tạo Blockfrost API để liệt kê UTxO
-api = BlockFrostApi(project_id=blockfrost_api_key, base_url=base_url)
+api = BlockFrostApi(project_id=blockfrost_api_key, 
+                    base_url=base_url)
 
 # Lấy tất cả UTxO của địa chỉ
 try:
@@ -135,7 +137,8 @@ except Exception as e:
 
 # === BƯỚC 4: XÂY DỰNG GIAO DỊCH ===
 # Tạo context để builder biết thông tin mạng (slot, protocol param...)
-cardano = BlockFrostChainContext(project_id=blockfrost_api_key, base_url=base_url)
+cardano = BlockFrostChainContext(project_id=blockfrost_api_key, 
+                                 base_url=base_url)
 
 # TransactionBuilder cho consolidate
 builder = TransactionBuilder(cardano)
@@ -153,12 +156,15 @@ builder = TransactionBuilder(cardano)
 # ta sẽ nhận được một danh sách các utxo 
 # nhưng đây là dữ liệu thô của blockfrost 
 # chưa phải là utxo object của pycardano
-# # Để tạo ra utxo nó sẽ có 2 thành phần chính là TransactionInput và TransactionOutput
+# # Để tạo ra utxo nó sẽ có 2 thành phần chính là TransactionInput 
+# và TransactionOutput
 # # Trong transactionInput sẽ bao gồm tx_hash và tx_index
 # # Trong transactionOutput sẽ bao gồm address và value 
 # # chính vì thế mà mỗi một utxo sẽ được tạo ra từ 2 thành phần này
-# # Khi lấy utxo từ blockfrost api ta sẽ nhận được một danh sách các utxo
-# # Ta sẽ duyệt qua từng utxo trong danh sách và tạo TransactionInput và TransactionOutput
+# # Khi lấy utxo từ blockfrost api ta sẽ nhận 
+# được một danh sách các utxo
+# # Ta sẽ duyệt qua từng utxo trong danh sách và 
+# tạo TransactionInput và TransactionOutput
 # === BẮT ĐẦU VÒNG LẶP XỬ LÝ UTXO ===
 print(f"\n--- TÌM THẤY {len(utxos)} UTXO. BẮT ĐẦU GỘP... ---")
 for i, utxo in enumerate(utxos):

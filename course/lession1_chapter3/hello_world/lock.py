@@ -103,13 +103,76 @@ script_address = Address(
 
 print(f"Địa chỉ hợp đồng (script): {script_address}")
 
-# Định nghĩa Datum class (PlutusData) khớp với on-chain type
+# Định nghĩa Datum class (PlutusData) để đóng gói
+# dữ liệu thành định dạng CBOR khớp với on-chain type
 @dataclass
-class HelloWorldDatum(PlutusData):
-    CONSTR_ID = 0
+class HelloWorldDatum(PlutusData):# Datum kế thừa PlutusData
+    CONSTR_ID = 0 
     owner: bytes  # VerificationKeyHash.to_primitive() trả về bytes
 
+# === Giải thích CONSTR_ID ===
+# Ý nghĩa: Trong Plutus Core, các kiểu dữ liệu thường được định nghĩa dưới dạng Sum Types 
+# (ví dụ: data MyDatum = ActionA | ActionB). 
+# Mỗi lựa chọn (ActionA, ActionB) được gán một chỉ số (index), bắt đầu từ 0.
+# CONSTR_ID = 0 nghĩa là HelloWorldDatum tương ứng 
+# với lựa chọn đầu tiên trong kiểu dữ liệu trên chuỗi.
+# Ví dụ, nếu kiểu dữ liệu trên chuỗi định nghĩa: data HelloWorldDatum = MkHelloWorldDatum ByteString 
+# thì CONSTR_ID = 0 biểu thị rằng đây là lựa chọn duy nhất và đầu tiên.
+# Ví dụ có 2 lựa chọn, CONSTR_ID = 0 sẽ là lựa chọn đầu tiên, CONSTR_ID = 1 sẽ là lựa chọn thứ hai.
+# Ví dụ datum trên chuỗi:
+# data HelloWorldDatum = MkHelloWorldDatum ByteString | AnotherDatumConstructor Integer
+# thì CONSTR_ID = 0 tương ứng với MkHelloWorldDatum, CONSTR_ID = 1 tương ứng với AnotherDatumConstructor.
+
+# === Ví dụ thực tế về Datum với nhiều CONSTR_ID ===
+# Ví dụ thực tế datum có 2 lựa chọn:
+# -- On-chain code example (Aiken) --
+# data EscrowState = 
+#       OnSale                        -- Index 0: Chỉ chứa giá tiền, người bán
+#         { seller :: PubKeyHash
+#         , price  :: Integer 
+#         }
+#     | FundsLocked                   -- Index 1: Chứa thêm thông tin người mua
+#         { seller :: PubKeyHash
+#         , buyer  :: PubKeyHash      -- Thêm trường này
+#         , price  :: Integer
+#         }
+
+# === Định nghĩa hai trạng thái datum với CONSTR_ID khác nhau ===
+# # --- Trạng thái 1: Đang rao bán (CONSTR_ID = 0) ---
+# @dataclass
+# class OnSaleDatum(PlutusData):
+#     CONSTR_ID = 0
+#     seller: bytes
+#     price: int
+
+# # --- Trạng thái 2: Đã có người mua, khóa tiền (CONSTR_ID = 1) ---
+# @dataclass
+# class FundsLockedDatum(PlutusData):
+#     CONSTR_ID = 1
+#     seller: bytes
+#     buyer: bytes  # Lúc này mới xuất hiện người mua
+#     price: int
 # Tạo datum (owner = hash của payment verification key của ví)
+# Tuy nhiên, với các ứng dụng phức tạp hơn (Game, DeFi, DAO), 
+# Datum đóng vai trò là một "Máy trạng thái" (State Machine). 
+# Datum sẽ thay đổi hình dạng tùy theo giai đoạn của hợp đồng.
+
+# Trên đây là một ví dụ thực tế về Hợp đồng Trung gian mua bán (Escrow).
+
+# Bài toán: Mua bán an toàn
+# Giai đoạn 1: Alice (Người bán) treo món hàng lên contract. 
+# Trạng thái là "Đang rao bán".
+
+# Giai đoạn 2: Bob (Người mua) gửi tiền vào contract. 
+# Trạng thái chuyển thành "Đã khóa tiền" (chờ Alice giao hàng).
+
+# Lúc này, Datum buộc phải có nhiều CONSTR_ID để phân biệt 2 trạng thái này.
+# === Hoặc dễ gặp và phổ biến nhất đó là khi bạn viết redeemer có nhiều lựa chọn khác nhau. ===
+# Ví dụ redeemer có 2 lựa chọn: "Mint" và "Burn". 
+# đây là một ví dụ phổ biến trong NFT minting policy.
+# Bạn sẽ định nghĩa 2 redeemer class với CONSTR_ID = 0 (Mint) và CONSTR_ID = 1 (Burn).
+# === Kết thúc ví dụ thực tế ===
+
 owner_vkey = payment_skey.to_verification_key()
 owner_hash = owner_vkey.hash()  # Sử dụng VerificationKeyHash như sample
 datum = HelloWorldDatum(owner=owner_hash.to_primitive())  # to_primitive() -> bytes
